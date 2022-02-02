@@ -1,0 +1,13 @@
+name = "TemplateMatching"
+uuid = "8a5bafa5-7804-46e7-8ed3-a510d2efa4f5"
+authors = ["Stefano Campanella <15182642+stefanocampanella@users.noreply.github.com> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1.5"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
