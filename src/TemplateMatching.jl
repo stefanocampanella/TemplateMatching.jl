@@ -22,20 +22,20 @@ function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}
     end
 
     if normalize_template
-        y_mean, y_std = mean_and_std(template, corrected=false)
-        y_norm = @. (template - y_mean) / y_std
+        template_mean, template_std = mean_and_std(template, corrected=false)
+        y = @. (template - template_mean) / template_std
     else
-        y_norm = template
+        y = template
     end
 
     N = size(template, 1)
     cc = Vector{cc_eltype}(undef, size(series, 1) - N + 1)
-    x_norm = similar(y_norm) 
+    x = similar(y) 
     for n in eachindex(cc)
-        x_view = view(series, n:n + N - 1)
-        x_mean, x_std = mean_and_std(x_view, corrected=false)
-        @. x_norm = (x_view - x_mean) / x_std
-        cc[n] = dot(x_norm, y_norm) / N
+        series_view = view(series, n:n + N - 1)
+        series_view_std = std(series_view, corrected=false)
+        @. x = series_view / series_view_std
+        cc[n] = dot(x, y) / N
     end
     cc
 end
