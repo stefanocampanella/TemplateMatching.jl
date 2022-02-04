@@ -3,8 +3,9 @@ using Test
 using StatsBase
 
 @testset "TemplateMatching.jl" begin
-    @test_throws ErrorException crosscorrelate([1, 2, 3], Int[])
-    @test_throws ErrorException crosscorrelate(Int[], [1, 2, 3])
+    @test_throws ArgumentError crosscorrelate([1, 2, 3], Int[])
+    @test_throws ArgumentError crosscorrelate(Int[], [1, 2, 3])
+    @test_throws DimensionMismatch crosscorrelate([1, 2], [1, 2, 3])
     @test length(crosscorrelate([1, 2, 3], [1, 2])) == 2
     @test let 
         x = @. 1e3 * ($rand(100) - 0.5)

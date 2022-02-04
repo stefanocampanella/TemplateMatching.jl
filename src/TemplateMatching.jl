@@ -43,11 +43,15 @@ julia> crosscorrelate(sin.(0:0.25pi:2pi), [1, 1+√2, 1])
  -0.23258781949447394
 ```
 """
-function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}, 
-    cc_eltype::Type{T3}=Float64; normalize_template=true) where {T1 <: Number, T2 <: Number, T3 <: AbstractFloat}
+function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}, cc_eltype::Type{T3}=Float64; 
+    normalize_template=true) where {T1 <: Number, T2 <: Number, T3 <: AbstractFloat}
     
-    if isempty(series) || isempty(template)
-        error("Arguments must be non empty vectors")
+    if isempty(series)
+        throw(ArgumentError("Series must be a non empty vector"))
+    elseif isempty(template)
+        throw(ArgumentError("Template must be non empty vector"))
+    elseif size(series, 1) < size(template, 1)
+        throw(DimensionMismatch("Template is longer than series."))
     end
 
     if normalize_template
