@@ -6,13 +6,38 @@ using LinearAlgebra
 export crosscorrelate
 
 """
-    crosscorrelate(series, template, cc_eltype=Float64; normalize_template=false) -> Vector{cc_eltype}
+    crosscorrelate(series, template, cc_eltype=Float64; normalize_template=false)
 
-    Return the normalized cross-correlation `cc` between `series` and `template`. If `series` is a vector of ``n`` elements 
-    and template a vector of ``k`` elements, then `cc` is a vector of ``n - k + 1`` elements of type `cc_eltype`. 
-    The element of `cc` at position ``l`` is Pearson correlation coefficient between the segment of `series` 
-    starting at ``l`` and ``k`` elements long. See the [Wikipedia page](https://en.wikipedia.org/wiki/Cross-correlation#Normalization)
-    on cross-correlation for more details.
+Return the normalized cross-correlation between `series` and `template`. 
+
+If `series` is a vector of ``n`` elements and template a vector of ``N`` elements, 
+cross-correlation will be a vector of ``n - N + 1`` elements of type `cc_eltype`. 
+The element of cross-correlation ``χ_k`` is Pearson correlation coefficient between 
+``x^k_i`` denoting the elements of `series` ``x_{i + k}`` and 
+the elements of `template` ``y_i``, with ``i = 1, 2, \\dots, N``
+
+``
+χ_k = \\frac{\\sum{\\left(x^k_i - μ_{x^k}\\right) \\left(y_i - μ_y\\right)}}{N σ_{x^k} σ_y} \\, ,
+``
+
+where ``μ`` and ``σ`` denotes the mean and variance respectively.
+
+See the [Wikipedia page](https://en.wikipedia.org/wiki/Cross-correlation#Normalization) 
+on cross-correlation for more details.
+
+# Examples
+
+```jldoctest
+julia> crosscorrelate(sin.(0:0.25pi:2pi), [1, 1+√2, 1])
+7-element Vector{Float64}:
+  0.23258781949447394
+  1.000000000000001
+  0.23258781949447402
+  7.401486830834377e-17
+ -0.23258781949447394
+ -1.0000000000000007
+ -0.23258781949447394
+```
 """
 function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}, 
     cc_eltype::Type{T3}=Float64; normalize_template=true) where {T1 <: Number, T2 <: Number, T3 <: AbstractFloat}
