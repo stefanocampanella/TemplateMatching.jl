@@ -49,7 +49,7 @@ function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}
     if isempty(series)
         throw(ArgumentError("Series must be a non empty vector"))
     elseif isempty(template)
-        throw(ArgumentError("Template must be non empty vector"))
+        throw(ArgumentError("Template must be a non empty vector"))
     elseif size(series, 1) < size(template, 1)
         throw(DimensionMismatch("Template is longer than series."))
     end
