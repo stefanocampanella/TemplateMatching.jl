@@ -6,21 +6,25 @@ using LinearAlgebra
 export crosscorrelate
 
 """
-    crosscorrelate(series, template, cc_eltype=Float64; normalize_template=false)
+    crosscorrelate(series, template, cc_eltype=Float64; normalize_template=true)
 
 Return the normalized cross-correlation between `series` and `template`. 
 
 If `series` is a vector of ``n`` elements and template a vector of ``N`` elements, 
 cross-correlation will be a vector of ``n - N + 1`` elements of type `cc_eltype`. 
 The element of cross-correlation ``χ_k`` is Pearson correlation coefficient between 
-``x^k_i`` denoting the elements of `series` ``x_{i + k}`` and 
+``x^{(k)}_i`` denoting the elements of `series` ``x_{i + k}`` and 
 the elements of `template` ``y_i``, with ``i = 1, 2, \\dots, N``
 
 ``
-χ_k = \\frac{\\sum{\\left(x^k_i - μ_{x^k}\\right) \\left(y_i - μ_y\\right)}}{N σ_{x^k} σ_y} \\, ,
+χ_k = \\frac{\\sum{\\left(x^{(k)}_i - μ_{x^{(k)}}\\right) 
+\\left(y_i - μ_y\\right)}}{N σ_{x^{(k)}} σ_y} \\, ,
 ``
 
-where ``μ`` and ``σ`` denotes the mean and variance respectively.
+where ``μ`` and ``σ`` denotes the mean and variance respectively. 
+
+If `normalize_template` is set to false then `template` is assumed to have mean and std
+respectively equal to 0.0 and 1.0.
 
 See the [Wikipedia page](https://en.wikipedia.org/wiki/Cross-correlation#Normalization) 
 on cross-correlation for more details.
