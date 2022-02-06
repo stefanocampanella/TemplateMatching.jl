@@ -2,8 +2,9 @@ module TemplateMatching
 
 using StatsBase
 using LinearAlgebra
+using OffsetArrays
 
-export crosscorrelate, maxfilter
+export crosscorrelate, maxfilter, stack
 
 """
     crosscorrelate(series, template, cc_eltype=Float64; normalize_template=true)
@@ -104,6 +105,18 @@ function maxfilter(x, l)
         y[n] = maximum(view(x, lower:upper))
     end
     y
+end
+
+
+function stack(correlations, offsets, tolerance)
+    maxcorrelations = similar(correlations) 
+    Threads.@threads for n = eachindex(correlations)
+        maxcorrelations[n] = maxfilter(correlations[n], tolerance)
+    end
+    stackedcorrelations = OffsetVector.(maxcorrelations, offsets)
+    start = maximum(series -> first(axes(series, 1)), stackedcorrelations)
+    stop = minimum(series -> last(axes(series, 1)), stackedcorrelations)
+    sum(series -> view(series, start:stop), stackedcorrelations) / length(stackedcorrelations)
 end
 
 end
