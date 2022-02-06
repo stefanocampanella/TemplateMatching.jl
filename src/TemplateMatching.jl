@@ -2,6 +2,7 @@ module TemplateMatching
 
 using StatsBase
 using LinearAlgebra
+using OffsetArrays
 
 export crosscorrelate, maxfilter
 
@@ -56,16 +57,16 @@ function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}
 
     if normalize_template
         template_mean, template_std = mean_and_std(template, corrected=false)
-        y = @. (template - template_mean) / template_std
+        y = @. ($collect(template) - template_mean) / template_std
     else
-        y = template
+        y = collect(template)
     end
 
     N = size(template, 1)
     cc = Vector{cc_eltype}(undef, size(series, 1) - N + 1)
     x = similar(y) 
     for n in eachindex(cc)
-        series_view = view(series, n:n + N - 1)
+        series_view = view(collect(series), n:n + N - 1)
         series_view_std = std(series_view, corrected=false)
         @. x = series_view / series_view_std
         cc[n] = dot(x, y) / N
@@ -99,8 +100,8 @@ julia> maxfilter(sin.(0:0.25pi:2pi), 1)
 function maxfilter(x, l)
     y = similar(x)
     for n in eachindex(x)
-        lower = max(n - l, 1)
-        upper = min(n + l, length(x))
+        lower = max(n - l, first(axes(x, 1)))
+        upper = min(n + l, last(axes(x, 1)))
         y[n] = maximum(view(x, lower:upper))
     end
     y
