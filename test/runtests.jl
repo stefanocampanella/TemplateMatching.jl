@@ -2,7 +2,7 @@ using TemplateMatching
 using Test
 using StatsBase
 
-@testset "TemplateMatching.jl" begin
+@testset "Cross-correlate function" begin
     @test_throws ArgumentError crosscorrelate([1, 2, 3], Int[])
     @test_throws ArgumentError crosscorrelate(Int[], [1, 2, 3])
     @test_throws DimensionMismatch crosscorrelate([1, 2], [1, 2, 3])
