@@ -3,7 +3,7 @@ module TemplateMatching
 using StatsBase
 using LinearAlgebra
 
-export crosscorrelate
+export crosscorrelate, maxfilter
 
 """
     crosscorrelate(series, template, cc_eltype=Float64; normalize_template=true)
@@ -71,6 +71,39 @@ function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}
         cc[n] = dot(x, y) / N
     end
     cc
+end
+
+"""
+    maxfilter(x, tolerance)
+
+Return a vector of the same size of `x` whose element at index `n` is the maximum 
+of the elements of `x` which are at most `tolerance` apart from `x[n]` 
+(i.e. in a window of at most `2 * tolerance + 1` elements).
+
+# Examples
+
+```jldoctest
+julia> maxfilter(sin.(0:0.25pi:2pi), 1)
+9-element Vector{Float64}:
+  0.7071067811865475
+  1.0
+  1.0
+  1.0
+  0.7071067811865476
+  1.2246467991473532e-16
+ -0.7071067811865475
+ -2.4492935982947064e-16
+ -2.4492935982947064e-16
+```
+"""
+function maxfilter(x, l)
+    y = similar(x)
+    for n in eachindex(x)
+        lower = max(n - l, 1)
+        upper = min(n + l, length(x))
+        y[n] = maximum(view(x, lower:upper))
+    end
+    y
 end
 
 end
