@@ -2,7 +2,6 @@ module TemplateMatching
 
 using StatsBase
 using LinearAlgebra
-using OffsetArrays
 
 export crosscorrelate, maxfilter
 
