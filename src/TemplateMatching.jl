@@ -48,9 +48,9 @@ function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}
     normalize_template=true) where {T1 <: Number, T2 <: Number, T3 <: AbstractFloat}
     
     if isempty(series)
-        throw(ArgumentError("Series must be a non empty vector."))
+        throw(ArgumentError("Series must be a non-empty vector."))
     elseif isempty(template)
-        throw(ArgumentError("Template must be a non empty vector."))
+        throw(ArgumentError("Template must be a non-empty vector."))
     elseif size(series, 1) < size(template, 1)
         throw(DimensionMismatch("Template is longer than series."))
     end
@@ -107,16 +107,32 @@ function maxfilter(x, l)
     y
 end
 
+"""
+    stack(correlations, offsets)
 
-function stack(correlations, offsets, tolerance)
-    maxcorrelations = similar(correlations) 
-    Threads.@threads for n = eachindex(correlations)
-        maxcorrelations[n] = maxfilter(correlations[n], tolerance)
+Return the average cross-correlation after aligning `correlations`. 
+Each cross-correlation `correlations[n]` is shifted to the right by `offsets[n]`.
+
+# Examples
+
+```jldoctest
+julia> stack([[0, 1.0, 0, 0], [0, 0, 1.0, 0]], [1, 2])
+3-element Vector{Float64}:
+ 0.0
+ 1.0
+ 0.0
+```
+"""
+function stack(correlations::AbstractVector{T1}, offsets::AbstractVector{T2}) where {T1 <: AbstractVector, T2 <: Integer}
+    if isempty(correlations)
+        throw(ArgumentError("Cross-correlations vector must be non-empty."))
+    elseif size(correlations, 1) != size(offsets, 1)
+        throw(DimensionMismatch("Cross-correlations and offsets vectors must have the same length."))
     end
-    stackedcorrelations = OffsetVector.(maxcorrelations, offsets)
+    stackedcorrelations = OffsetVector.(correlations, -offsets)
     start = maximum(series -> first(axes(series, 1)), stackedcorrelations)
     stop = minimum(series -> last(axes(series, 1)), stackedcorrelations)
-    sum(series -> view(series, start:stop), stackedcorrelations) / length(stackedcorrelations)
+    mean(series -> view(series, start:stop), stackedcorrelations)
 end
 
 end

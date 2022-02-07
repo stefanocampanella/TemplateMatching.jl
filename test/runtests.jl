@@ -1,6 +1,7 @@
 using TemplateMatching
 using Test
 using StatsBase
+using LinearAlgebra
 
 
 @testset verbose = true "TemplateMatching.jl" begin
@@ -31,5 +32,13 @@ using StatsBase
         @test maxfilter([1, 2, 3], 0) == [1, 2, 3]
         @test maxfilter([1, 2, 3], 1) == [2, 3, 3]
         @test maxfilter([1, 2, 3], 2) == [3, 3, 3]
+    end
+
+    @testset "Stack" begin
+        @test_throws ArgumentError stack(Vector{Float64}[], Int[])
+        @test_throws DimensionMismatch stack([[1, 2, 3], [4, 5, 6]], [1, 2, 3])
+        @test stack([[I[i, j] ? 1 : 0 for i = 1:10] for j = 1:10], 1:10) == [1.0]
+        @test stack([[I[i, j] ? 10 : 0 for i = 1:10] for j = 1:10], zeros(Int, 10)) == ones(10)
+
     end
 end
