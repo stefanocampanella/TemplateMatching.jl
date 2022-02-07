@@ -117,7 +117,7 @@ Each cross-correlation `correlations[n]` is shifted to the right by `offsets[n]`
 
 ```jldoctest
 julia> stack([[0, 1.0, 0, 0], [0, 0, 1.0, 0]], [1, 2])
-3-element Vector{Float64}:
+3-element OffsetArray(::Vector{Float64}, 0:2) with eltype Float64 with indices 0:2:
  0.0
  1.0
  0.0
