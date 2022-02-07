@@ -136,24 +136,24 @@ function stack(correlations::AbstractVector{T1}, offsets::AbstractVector{T2}) wh
 end
 
 """
-    correlatetemplate(data, template, shifts, tolerance, [cc_eltype=Float64])
+    correlatetemplate(data, template, offsets, tolerance, [cc_eltype=Float64])
 
 Return the cross-correlation between `data` and `template`. The cross-correlations for each series 
-are aligned by `shifts` and averaged. If `tolerance`` is not zero, then the average accounts for possible
+are aligned using `offsets` and averaged. If `tolerance`` is not zero, then the average accounts for possible
 misplacement of each series by `tolerance` sample, and return the average of the maximum cross-correlation 
 compatible with that misplacement.
 """
-function correlatetemplate(data, template, shifts, tolerance, cc_eltype=Float64)
+function correlatetemplate(data, template, offsets, tolerance, cc_eltype=Float64)
     if isempty(data)
         throw(ArgumentError("Data must be non-empty."))
-    elseif !(size(data, 1) == size(template, 1) == size(shifts, 1))
+    elseif !(size(data, 1) == size(template, 1) == size(offsets, 1))
         throw(DimensionMismatch("Data, template and shifts must have the same length."))
     end
     correlations = similar(data, Vector{cc_eltype})
     Threads.@threads for n = eachindex(data)
         correlations[n] = maxfilter(crosscorrelate(data[n], template[n], cc_eltype), tolerance)
     end
-    stack(correlations, shifts)
+    stack(correlations, offsets)
 end
 
 end
