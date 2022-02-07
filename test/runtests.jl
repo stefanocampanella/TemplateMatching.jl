@@ -12,18 +12,19 @@ using OffsetArrays
         @test_throws ArgumentError crosscorrelate(Int[], [1, 2, 3])
         @test_throws DimensionMismatch crosscorrelate([1, 2], [1, 2, 3])
         @test length(crosscorrelate([1, 2, 3], [1, 2])) == 2
-        @test let 
+        let 
             x = @. 1e3 * ($rand(100) - 0.5)
             y = @view x[45:55]
             y_mean, y_std = mean_and_std(y, corrected=false)
             z = @. (y - y_mean) / y_std
-            all(crosscorrelate(x, z, normalize_template=false) .≈ crosscorrelate(x, y) )
+            @test all(crosscorrelate(x, z, normalize_template=false) .≈ crosscorrelate(x, y) )
         end
-        @test let 
+        let 
             x = @. 1e3 * ($rand(100) - 0.5)
             y = @view x[45:55]
             cc, indx = findmax(crosscorrelate(x, y))
-            cc ≈ 1.0 && indx == 45
+            @test cc ≈ 1.0 
+            @test indx == 45
         end
     end
 
@@ -41,5 +42,19 @@ using OffsetArrays
         @test_throws DimensionMismatch stack([[1, 2, 3], [4, 5, 6]], [1, 2, 3])
         @test stack([[I[i, j] ? 1 : 0 for i = 1:10] for j = 1:10], 1:10) == OffsetVector([1.0], 0:0)
         @test stack([[I[i, j] ? 10 : 0 for i = 1:10] for j = 1:10], zeros(Int, 10)) == ones(10)
+    end
+
+    @testset "Correlate template" begin
+        @test_throws ArgumentError correlatetemplate(Vector{Float64}[], Vector{Float64}[], Int[], 0)
+        @test_throws DimensionMismatch correlatetemplate([[1, 2, 3], [4, 5, 6], [7, 8, 9]], [[1, 2, 3], [4, 5, 6]], [1, 2], 0)
+        let 
+            data = [rand(100) for _ = 1:10]
+            template = [view(data[n], 45 + n:55 + n) for n = eachindex(data)]
+            shifts = [45 + n for n = eachindex(data)]
+            cc, indx = findmax(correlatetemplate(data, template, shifts, 0))
+            @test cc ≈ 1.0 
+            @test indx == 0
+        end
+        
     end
 end

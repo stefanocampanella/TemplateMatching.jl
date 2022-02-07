@@ -4,10 +4,10 @@ using StatsBase
 using LinearAlgebra
 using OffsetArrays
 
-export crosscorrelate, maxfilter, stack
+export crosscorrelate, maxfilter, stack, correlatetemplate
 
 """
-    crosscorrelate(series, template, cc_eltype=Float64; normalize_template=true)
+    crosscorrelate(series, template, [cc_eltype=Float64], normalize_template=true)
 
 Return the normalized cross-correlation between `series` and `template`. 
 
@@ -133,6 +133,27 @@ function stack(correlations::AbstractVector{T1}, offsets::AbstractVector{T2}) wh
     start = maximum(series -> first(axes(series, 1)), stackedcorrelations)
     stop = minimum(series -> last(axes(series, 1)), stackedcorrelations)
     OffsetVector(mean(series -> view(series, start:stop), stackedcorrelations), start:stop)
+end
+
+"""
+    correlatetemplate(data, template, shifts, tolerance, [cc_eltype=Float64])
+
+Return the cross-correlation between `data` and `template`. The cross-correlations for each series 
+are aligned by `shifts` and averaged. If `tolerance`` is not zero, then the average accounts for possible
+misplacement of each series by `tolerance` sample, and return the average of the maximum cross-correlation 
+compatible with that misplacement.
+"""
+function correlatetemplate(data, template, shifts, tolerance, cc_eltype=Float64)
+    if isempty(data)
+        throw(ArgumentError("Data must be non-empty."))
+    elseif !(size(data, 1) == size(template, 1) == size(shifts, 1))
+        throw(DimensionMismatch("Data, template and shifts must have the same length."))
+    end
+    correlations = similar(data, Vector{cc_eltype})
+    Threads.@threads for n = eachindex(data)
+        correlations[n] = maxfilter(crosscorrelate(data[n], template[n], cc_eltype), tolerance)
+    end
+    stack(correlations, shifts)
 end
 
 end
