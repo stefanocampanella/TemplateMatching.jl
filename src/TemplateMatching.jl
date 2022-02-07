@@ -132,7 +132,7 @@ function stack(correlations::AbstractVector{T1}, offsets::AbstractVector{T2}) wh
     stackedcorrelations = OffsetVector.(correlations, -offsets)
     start = maximum(series -> first(axes(series, 1)), stackedcorrelations)
     stop = minimum(series -> last(axes(series, 1)), stackedcorrelations)
-    mean(series -> view(series, start:stop), stackedcorrelations)
+    OffsetVector(mean(series -> view(series, start:stop), stackedcorrelations), start:stop)
 end
 
 end

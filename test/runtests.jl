@@ -2,6 +2,8 @@ using TemplateMatching
 using Test
 using StatsBase
 using LinearAlgebra
+using OffsetArrays
+
 
 
 @testset verbose = true "TemplateMatching.jl" begin
@@ -37,8 +39,7 @@ using LinearAlgebra
     @testset "Stack" begin
         @test_throws ArgumentError stack(Vector{Float64}[], Int[])
         @test_throws DimensionMismatch stack([[1, 2, 3], [4, 5, 6]], [1, 2, 3])
-        @test stack([[I[i, j] ? 1 : 0 for i = 1:10] for j = 1:10], 1:10) == [1.0]
+        @test stack([[I[i, j] ? 1 : 0 for i = 1:10] for j = 1:10], 1:10) == OffsetVector([1.0], 0:0)
         @test stack([[I[i, j] ? 10 : 0 for i = 1:10] for j = 1:10], zeros(Int, 10)) == ones(10)
-
     end
 end
