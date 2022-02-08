@@ -100,4 +100,11 @@ using OffsetArrays
             @test isapprox(magnitude_test_f(n -> 10 * rand(n), rand), 1.0, atol=1e-2)
         end
     end
+
+    @testset "Find maximum in window" begin
+        @test_throws ArgumentError findmax_window(Float64[], 0, 0)
+        let x = rand(11)
+            @test findmax_window(x, 6, 5) == findmax(x)
+        end
+    end
 end
