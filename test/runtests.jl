@@ -77,5 +77,10 @@ using OffsetArrays
             @test peaks == [51]
             @test heights ≈ [2.0]
         end
+        let
+            peaks, heights = findpeaks([x < pi ? abs(sin(x)) : 2 * abs(sin(x)) for x = 0:0.01pi:2pi], 1.0, 0)
+            @test peaks == [151]
+            @test heights ≈ [2.0]
+        end
     end
 end
