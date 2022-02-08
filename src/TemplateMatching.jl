@@ -247,7 +247,7 @@ function mad_test(xs, r=3.0)
 end
 
 function series_magnitude(series, template, index)
-    series_amp = maximum(abs.(view(series, index:index + size(template, 1))))
+    series_amp = maximum(abs.(view(series, index:index + size(template, 1) - 1)))
     template_amp = maximum(abs.(template))
     if iszero(template_amp)
         NaN
