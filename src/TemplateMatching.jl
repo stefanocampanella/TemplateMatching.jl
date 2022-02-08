@@ -4,7 +4,7 @@ using StatsBase
 using LinearAlgebra
 using OffsetArrays
 
-export crosscorrelate, maxfilter, stack, correlatetemplate, findpeaks
+export crosscorrelate, maxfilter, stack, correlatetemplate, findpeaks, magnitude
 
 """
     crosscorrelate(series, template, [cc_eltype=Float64], normalize_template=true)
@@ -222,6 +222,54 @@ function findpeaks(signal::AbstractVector, threshold::Number, distance::Number)
 	else
 		peaks, heights
 	end
+end
+
+"""
+    mad_test(xs, [r=3])
+
+Return a vector of booleans whose elements are `true` if the absolute deviation 
+from the median of `xs` of the corresponding elements (of `xs`) is at least 
+`r` times the median absolute deviation, and `false` otherwise.
+
+# Examples
+```jldoctest
+julia> TemplateMatching.mad_test([1, 2, 3, 100])
+4-element BitVector:
+ 0
+ 0
+ 0
+ 1
+```
+"""
+function mad_test(xs, r=3.0)
+    deviations = abs.(xs .- median(xs))
+    deviations .> r * median(deviations)
+end
+
+function series_magnitude(series, template, index)
+    series_amp = maximum(abs.(view(series, index:index + size(template, 1))))
+    template_amp = maximum(abs.(template))
+    if iszero(template_amp)
+        NaN
+    elseif iszero(series_amp)
+        NaN
+    else
+        log10(series_amp / template_amp)
+    end
+end
+
+"""
+    magnitude(data, template, indices, [outlier=TemplateMatching.mad], [avg=StatsBase.mean])
+
+Return the average relative magnitude of the view of series in `data` starting at `indices` and 
+having the same length of the corresponding `template` series. The outliers, i.e. the elements 
+corresponding to those of `outlier(magnitudes)` evaluates that are true, are excluded. The average
+is calculated using `avg(magnitudes)`.
+
+"""
+function magnitude(data, template, indices, outlier=mad_test, avg=mean)
+    magnitudes = series_magnitude.(data, template, indices)
+    avg(magnitudes[.!outlier(magnitudes)])
 end
 
 end

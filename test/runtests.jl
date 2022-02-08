@@ -83,4 +83,16 @@ using OffsetArrays
             @test heights ≈ [2.0]
         end
     end
+
+    @testset "Magnitude" begin
+        @test isnan(magnitude([rand(100) for _ = 1:10], [fill(0.0, 10) for _ = 1:10], [45 for _ = 1:10]))
+        @test isnan(magnitude([fill(0.0, 100) for _ = 1:10], [rand(10) for _ = 1:10], [45 for _ = 1:10]))
+        let num_series = 100, n1 = 100, n2 = 20, indx = 40, num_samples = 1000
+            magnitude_test_f(f1, f2) = magnitude([f1(n1) for _ = 1:num_series], [f2(n2) for _ = 1:num_series], [indx for _ = 1:num_series])
+            magnitude_test_f(f1, f2, n) = mean([magnitude_test_f(f1, f2) for _ = 1:n])
+            @test magnitude_test_f(n -> fill(5.0, n), n -> fill(0.5, n)) == 1.0
+            @test isapprox(magnitude_test_f(rand, rand, num_samples), 0.0, atol=1e-3)
+            @test isapprox(magnitude_test_f(n -> 10 * rand(n), rand, num_samples), 1.0, atol=1e-3)
+        end
+    end
 end
