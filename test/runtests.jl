@@ -55,6 +55,27 @@ using OffsetArrays
             @test cc ≈ 1.0 
             @test indx == 0
         end
-        
+    end
+
+    @testset "Find Peaks" begin
+        @test findpeaks([], 0, 0) == (Int[], [])
+        let 
+            x = rand(100)
+            y = view(x, 40:60)
+            cc = crosscorrelate(x, y)
+            peaks, heights = findpeaks(cc, 0.99, 0)
+            @test peaks == [40]
+            @test heights ≈ [1.0]
+        end
+        let
+            peaks, heights = findpeaks([x < pi ? 2 * abs(sin(x)) : abs(sin(x)) for x = 0:0.01pi:2pi], 0, 100)
+            @test peaks == [51]
+            @test heights ≈ [2.0]
+        end
+        let
+            peaks, heights = findpeaks([x < pi ? 2 * abs(sin(x)) : abs(sin(x)) for x = 0:0.01pi:2pi], 1.0, 0)
+            @test peaks == [51]
+            @test heights ≈ [2.0]
+        end
     end
 end
