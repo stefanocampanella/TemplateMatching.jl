@@ -265,7 +265,6 @@ Return the average relative magnitude of the view of series in `data` starting a
 having the same length of the corresponding `template` series. The outliers, i.e. the elements 
 corresponding to those of `outlier(magnitudes)` evaluates that are true, are excluded. The average
 is calculated using `avg(magnitudes)`.
-
 """
 function magnitude(data, template, indices, outlier=mad_test, avg=mean)
     magnitudes = series_magnitude.(data, template, indices)
