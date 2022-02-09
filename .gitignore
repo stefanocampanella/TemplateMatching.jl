@@ -1,3 +1,4 @@
+data/*
 scratch/*
 **/.DS_Store
 *.jl.*.cov
