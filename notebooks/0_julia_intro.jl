@@ -1,8 +1,15 @@
 ### A Pluto.jl notebook ###
-# v0.17.7
+# v0.18.0
 
 using Markdown
 using InteractiveUtils
+
+# ╔═╡ aff9313b-2fd8-46ca-b399-47fa21b324c5
+begin
+    import Pkg
+    Pkg.activate(Base.current_project())
+    Pkg.instantiate()
+end
 
 # ╔═╡ bcca4c48-89be-11ec-3c89-3189fd524f08
 md"""
@@ -70,25 +77,9 @@ In theory, one might write Julia code without thinking or caring about types, li
 The most used type in scientific computing is probably the array, i.e. a data type that represent indexed objects of the same type and contiguous in memory. Julia has a rich type system that includes arrays. In particular, arrays are an example of parametric types in Julia, i.e. types that depends on other types. The arguments of a dependent type are surrounded by braces, so for example `Array{Float64, 1}` is the type of one-dimensional arrays of 64-bit floating points numbers. To produce an exemplar of this type, you have to call its constructor. The constructor is a function with the same name of the type. In the case of one-dimensional array (or vector) constructors, they take two arguments, the value with which filling the array and the number of elements, so for example `Array{Float64, 1}(1.0, 10)` will be a ten element vector filled with the number 1.0. Array indexing in Julia is similar to Python with one important exceptions, in Julia one starts to count from 1 instead of 0, as you would do in Fortran or Matlab. Also, the last element is indicated with the keyword `end` and you can apply a function that acts on scalars element-wise on arrays posfixing a dot to its name in the function call, as in the function definition below (really, the dot notation is used for broadcasting, a powerful concept that should be familiar to Numpy user).
 """
 
-# ╔═╡ 00000000-0000-0000-0000-000000000001
-PLUTO_PROJECT_TOML_CONTENTS = """
-[deps]
-"""
-
-# ╔═╡ 00000000-0000-0000-0000-000000000002
-PLUTO_MANIFEST_TOML_CONTENTS = """
-# This file is machine-generated - editing it directly is not advised
-
-julia_version = "1.7.1"
-manifest_format = "2.0"
-
-[deps]
-"""
-
 # ╔═╡ Cell order:
+# ╠═aff9313b-2fd8-46ca-b399-47fa21b324c5
 # ╟─bcca4c48-89be-11ec-3c89-3189fd524f08
 # ╟─11ba1299-05e6-46c1-8716-ac06d5fc46a5
 # ╟─6dca0719-eeb3-42d5-8585-f89a77e579b3
 # ╟─364a442a-17ef-455d-9608-aecd3126db59
-# ╟─00000000-0000-0000-0000-000000000001
-# ╟─00000000-0000-0000-0000-000000000002

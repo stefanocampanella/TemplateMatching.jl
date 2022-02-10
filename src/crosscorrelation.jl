@@ -1,10 +1,10 @@
 """
-    crosscorrelate(series, template, [cc_eltype=Float64], normalize_template=true)
+    crosscorrelate(series, template, [element_type=Float64], normalize_template=true)
 
 Return the normalized cross-correlation between `series` and `template`. 
 
 If `series` is a vector of ``n`` elements and template a vector of ``N`` elements, 
-cross-correlation will be a vector of ``n - N + 1`` elements of type `cc_eltype`. 
+cross-correlation will be a vector of ``n - N + 1`` elements of type `element_type`. 
 The element of cross-correlation ``χ_k`` is Pearson correlation coefficient between 
 ``x^{(k)}_i`` denoting the elements of `series` ``x_{i + k}`` and 
 the elements of `template` ``y_i``, with ``i = 1, 2, \\dots, N``
@@ -36,7 +36,7 @@ julia> crosscorrelate(sin.(0:0.25pi:2pi), [1, 1+√2, 1])
  -0.23258781949447394
 ```
 """
-function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}, cc_eltype::Type{T3}=Float64; 
+function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}, element_type::Type{T3}=Float64; 
     normalize_template=true) where {T1 <: Number, T2 <: Number, T3 <: AbstractFloat}
     
     if isempty(series)
@@ -49,16 +49,16 @@ function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}
 
     if normalize_template
         template_mean, template_std = mean_and_std(template, corrected=false)
-        y = @. ($collect(template) - template_mean) / template_std
+        y = @. (template - template_mean) / template_std
     else
-        y = collect(template)
+        y = template
     end
 
     N = size(template, 1)
-    cc = Vector{cc_eltype}(undef, size(series, 1) - N + 1)
+    cc = Vector{element_type}(undef, size(series, 1) - N + 1)
     x = similar(y) 
     for n in eachindex(cc)
-        series_view = view(collect(series), n:n + N - 1)
+        series_view = view(series, n:n + N - 1)
         series_view_std = std(series_view, corrected=false)
         @. x = series_view / series_view_std
         cc[n] = dot(x, y) / N
@@ -128,22 +128,22 @@ function stack(correlations::AbstractVector{T1}, offsets::AbstractVector{T2}) wh
 end
 
 """
-    correlatetemplate(data, template, offsets, tolerance, [cc_eltype=Float64])
+    correlatetemplate(data, template, offsets, tolerance, [element_type=Float64])
 
 Return the cross-correlation between `data` and `template`. The cross-correlations for each series 
 are aligned using `offsets` and averaged. If `tolerance`` is not zero, then the average accounts for possible
 misplacement of each series by `tolerance` sample, and return the average of the maximum cross-correlation 
 compatible with that misplacement.
 """
-function correlatetemplate(data, template, offsets, tolerance, cc_eltype=Float64)
+function correlatetemplate(data, template, offsets, tolerance, element_type=Float64)
     if isempty(data)
         throw(ArgumentError("Data must be non-empty."))
     elseif !(size(data, 1) == size(template, 1) == size(offsets, 1))
         throw(DimensionMismatch("Data, template and shifts must have the same length."))
     end
-    correlations = similar(data, Vector{cc_eltype})
+    correlations = similar(data, Vector{element_type})
     Threads.@threads for n = eachindex(data)
-        correlations[n] = maxfilter(crosscorrelate(data[n], template[n], cc_eltype), tolerance)
+        correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type), tolerance)
     end
     stack(correlations, offsets)
 end

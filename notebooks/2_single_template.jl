@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.17.7
+# v0.18.0
 
 using Markdown
 using InteractiveUtils
@@ -17,9 +17,7 @@ end
 # ╔═╡ aa854f02-46bf-4a2b-b1e9-5fb52b99925c
 begin
     import Pkg
-    # activate the shared project environment
     Pkg.activate(Base.current_project())
-    # instantiate, i.e. make sure that all packages are downloaded
     Pkg.instantiate()
 end
 
@@ -142,36 +140,28 @@ Template post:$(@bind t_post Slider(0:400, default=200, show_value=true))
 # ╔═╡ be80dd80-d39d-4338-bb76-c644ea9d970c
 cuts = [shift - t_pre: shift + t_post for shift in shifts]
 
-# ╔═╡ 120cd0c7-2e57-46de-86db-044494d54fdf
-maketemplate(data, cuts) = [view(series, cut) for (series, cut) in zip(values(data), cuts)]
-
 # ╔═╡ aa23d53f-8333-4c94-8932-fac99ce9196d
-template = maketemplate(data, cuts)
+template = [view(series, cut) for (series, cut) in zip(values(data), cuts)]
 
 # ╔═╡ 4ef908f4-d8dc-4159-97ad-fc8d4621a652
-function plottemplate(template, cuts, shifts; kwargs...)
+let
+	xlim = minimum(first(axes(series, 1)) for series in template), maximum(last(axes(series, 1)) for series in template)
 	plots = []
-	numchannels = length(template)
-	xlims = minimum(values(shifts)), maximum(values(shifts)) + maximum(x -> x[2] - x[1], values(cuts))
-	for (nch, series) in template
-		a = shifts[nch]
-		b = a + (cuts[nch][2] - cuts[nch][1])
-		ylims = minimum(series), maximum(series)
+	for (nch, series, shift, cut) = zip(keys(data), template, shifts, cuts)
+		ylim = minimum(series), maximum(series)
 		push!(plots, 
-			  plot(a:b, series; 
-			  title="Channel $nch",
-				titlealign=:left,
-				showaxis=false,
-				ticks=false,
-				label=nothing,
-				xlims,
-				ylims))
+			  plot(axes(series, 1), series;
+				   xlim,
+				   ylim,
+			       title="Channel $nch",
+				   titlealign=:left,
+				   showaxis=false,
+				   ticks=false,
+				   label=nothing))
 	end
+	numchannels = length(template)
 	plot(plots..., layout=(numchannels, 1), size=(800, 100numchannels), dpi=300)
 end
-
-# ╔═╡ 5a09c818-11db-428b-ad51-a4ad8a5c7ff7
-plottemplate(template, cuts, shifts)
 
 # ╔═╡ 368f7fc1-0afc-439f-905a-76af04e8ca8d
 md" ## Computing the cross-correlation"
@@ -181,32 +171,23 @@ md"""
 tolerance $(@bind tolerance Slider(0:10, default=5, show_value=true))
 """
 
-# ╔═╡ ed21b47d-d4d6-4e31-b6a2-4d5491ff0879
-data
-
 # ╔═╡ a7a589fc-4dcc-4137-a423-b8d2e7d41a0e
 signal = correlatetemplate(collect(values(data)), template, offsets, tolerance)
 
-# ╔═╡ 505f3691-1573-4972-abba-b24b759cbca6
-plotcorrelations(correlations, plotzoom, plotcenter)
-
 # ╔═╡ 91924a12-6ee4-4d1b-8c49-9b54142cf733
-let scale = plotzoom, center = template_ref_samples[template_num] - t_pre
-	a = max(first(axes(signal, 1)), center - div(scale, 2))
-	b = min(last(axes(signal, 1)), center + div(scale, 2))
+let
+	a = max(first(axes(signal, 1)), catalogue[template_num, :sample] - 2t_pre)
+	b = min(last(axes(signal, 1)), catalogue[template_num, :sample] + t_post - t_pre)
 	plot(a:b, signal[a:b], label=nothing, dpi=300)
 end
 
 # ╔═╡ abb8b867-39c2-40f2-9d7a-f40bacf8f550
 md" ## Finding peaks"
 
-# ╔═╡ a940ba49-d62a-4a33-a822-5324bf6e657a
-md"""
-correlation threshold $(@bind threshold Slider(0.0:0.05:1, default=0.5, show_value=true))
-"""
-
 # ╔═╡ 7d1f1903-8342-4715-8e88-3e3d063ea5db
 md"""
+correlation threshold $(@bind threshold Slider(0.0:0.05:1, default=0.5, show_value=true))
+
 distance (in unit of template length) $(@bind reldistance Slider(0:0.5:5, default=2, show_value=true))
 """
 
@@ -215,11 +196,11 @@ peaks, heights = findpeaks(signal, threshold, reldistance * (t_pre + t_post - 1)
 
 # ╔═╡ 96deaa3d-fc40-466f-bf1b-d8d3dd58dcd4
 md"""
-Peak number $(@bind window_pos Slider(1:length(peaks), default=1, show_value=true))
+Peak number $(@bind window_pos Slider(axes(peaks, 1), default=1, show_value=true))
 """
 
 # ╔═╡ cc0c3e0a-4208-4339-bea1-75396b2778bd
-let plt = plot(ylims=(0.0, 1.0)), scale = plotzoom
+let plt = plot(ylims=(0.0, 1.0)), scale = round(Int, reldistance * (t_post + t_pre))
 	a = max(first(axes(signal, 1)), peaks[window_pos] - scale)
 	b = min(last(axes(signal, 1)), peaks[window_pos] + scale)
 	plot!(plt, a:b, signal[a:b], label=nothing)
@@ -228,35 +209,29 @@ let plt = plot(ylims=(0.0, 1.0)), scale = plotzoom
 	plt
 end
 
-# ╔═╡ d135ff43-c2b2-45f1-96ce-ce7830dd1529
-peakmagnitudes = map(x -> channelmagnitudes(x, good_data, template, offsets, t_pre, t_post), peaks)
-
 # ╔═╡ ff450e8c-83ee-4e70-b9f4-31d6e1e99b62
-catalogue[template_num, [:Year, :Month, :Day, :Hour, :Minute, :Second]]
+catalogue[template_num, [:Year, :Month, :Day, :Hour, :Minute, :Second, :sample]]
 
 # ╔═╡ 33bc3279-c65f-47b5-acf4-60853c2bdb91
-function detections_dataframe(template_num, starttime, t_pre, peaks, heights, peakmagnitudes)
-	datetimes = @. starttime + Microsecond(peaks + t_pre)
+begin
+	datetimes = @. starttime + Microsecond(peaks - t_pre)
 	output_catalogue = DataFrame()
 	for (r, s) in [(:year, :Year), (:month, :Month), (:day, :Day), (:hour, :Hour), (:minute, :Minute)]
 		output_catalogue[!, s] = getproperty(Dates, r).(datetimes)
 	end
-	output_catalogue[!, :Second] = @. Dates.second(datetimes) + 1e-3 * Dates.millisecond(datetimes)
-	output_catalogue[!, :template] .= template_num
-	output_catalogue[!, :correlation] = heights
-	output_catalogue[!, :relative_magnitude] = 
-		estimatemean.([collect(values(ms)) for ms in values(peakmagnitudes)], 2) 
+	output_catalogue.Second = @. Dates.second(datetimes) + 1e-3 * Dates.millisecond(datetimes)
+	output_catalogue.sample = peaks .- t_pre
+	output_catalogue.template .= template_num
+	output_catalogue.correlation = heights
+	output_catalogue.relative_magnitude = [magnitude(values(data), template, peak .+ offsets .- t_pre) for peak in peaks]
 	output_catalogue
 end
-
-# ╔═╡ e9aa2ca0-1ba6-47a5-ba84-cdc713ee754f
-output_catalogue = detections_dataframe(template_num, starttime, t_pre, peaks, heights, peakmagnitudes)
 
 # ╔═╡ 102e4534-6be4-4436-be36-69726a393253
 md" ## Statistics of the detections "
 
 # ╔═╡ 471f21ba-23d3-42f4-8d62-12fe2f36124f
-histogram(collect(signal), dpi=300)
+histogram(collect(signal), label=nothing)
 
 # ╔═╡ 6e2e9172-4cf5-45f3-a239-12c09b6ca3da
 summarystats(collect(signal))
@@ -272,8 +247,8 @@ histogram(output_catalogue[!, :relative_magnitude], label=nothing)
 
 # ╔═╡ Cell order:
 # ╠═aa854f02-46bf-4a2b-b1e9-5fb52b99925c
-# ╠═8b4426b8-588b-49ad-83c5-a79ed698d704
 # ╟─c2f22858-6d3c-4f92-a05b-659deae566f6
+# ╠═8b4426b8-588b-49ad-83c5-a79ed698d704
 # ╟─a86b6c8a-9b90-4388-8208-d257ec6951d2
 # ╠═d47c1cf4-4844-4c66-8a21-b62ad7740dcf
 # ╠═f3f17c65-dab6-46da-83a9-87aad1181524
@@ -302,27 +277,20 @@ histogram(output_catalogue[!, :relative_magnitude], label=nothing)
 # ╠═cd5f912a-fafb-4947-bd70-318151c2c49c
 # ╟─033473d3-6958-4e7b-8c95-a9e15d882118
 # ╠═be80dd80-d39d-4338-bb76-c644ea9d970c
-# ╠═120cd0c7-2e57-46de-86db-044494d54fdf
 # ╠═aa23d53f-8333-4c94-8932-fac99ce9196d
-# ╠═4ef908f4-d8dc-4159-97ad-fc8d4621a652
-# ╠═5a09c818-11db-428b-ad51-a4ad8a5c7ff7
+# ╟─4ef908f4-d8dc-4159-97ad-fc8d4621a652
 # ╟─368f7fc1-0afc-439f-905a-76af04e8ca8d
 # ╠═342cbcff-5a05-4199-b5b5-6cc0fa70c202
 # ╟─0d122aef-1767-4389-b043-97d07ecef1fe
-# ╠═ed21b47d-d4d6-4e31-b6a2-4d5491ff0879
 # ╠═a7a589fc-4dcc-4137-a423-b8d2e7d41a0e
-# ╠═505f3691-1573-4972-abba-b24b759cbca6
 # ╠═91924a12-6ee4-4d1b-8c49-9b54142cf733
 # ╟─abb8b867-39c2-40f2-9d7a-f40bacf8f550
-# ╟─a940ba49-d62a-4a33-a822-5324bf6e657a
 # ╟─7d1f1903-8342-4715-8e88-3e3d063ea5db
 # ╠═666c8d5f-c1c5-4cb4-9364-bf997b18a683
 # ╟─96deaa3d-fc40-466f-bf1b-d8d3dd58dcd4
 # ╠═cc0c3e0a-4208-4339-bea1-75396b2778bd
-# ╠═d135ff43-c2b2-45f1-96ce-ce7830dd1529
 # ╠═ff450e8c-83ee-4e70-b9f4-31d6e1e99b62
 # ╠═33bc3279-c65f-47b5-acf4-60853c2bdb91
-# ╠═e9aa2ca0-1ba6-47a5-ba84-cdc713ee754f
 # ╟─102e4534-6be4-4436-be36-69726a393253
 # ╠═471f21ba-23d3-42f4-8d62-12fe2f36124f
 # ╠═6e2e9172-4cf5-45f3-a239-12c09b6ca3da
