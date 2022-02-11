@@ -39,17 +39,14 @@ using Dates
 # ╔═╡ 41b0f95e-d806-4167-8199-7392717782f9
 using OffsetArrays
 
-# ╔═╡ 95f2bd0b-7d8b-43b9-b2f9-cfa6628ec485
-using LinearAlgebra
-
-# ╔═╡ 356cc4c2-e565-4847-9286-cfc1f835654d
-using StatsBase
+# ╔═╡ 342cbcff-5a05-4199-b5b5-6cc0fa70c202
+using TemplateMatching
 
 # ╔═╡ f07ab63f-dfb4-493c-a40c-6b3363a858c3
 using Plots
 
-# ╔═╡ 342cbcff-5a05-4199-b5b5-6cc0fa70c202
-using TemplateMatching
+# ╔═╡ 356cc4c2-e565-4847-9286-cfc1f835654d
+using StatsBase
 
 # ╔═╡ c2f22858-6d3c-4f92-a05b-659deae566f6
 md"## Reading Continuous Data"
@@ -225,8 +222,8 @@ let
 			zcolor=templatematch_catalogue.correlation,
 			c=:heat,
 			markersize=4exp.(templatematch_catalogue.relative_magnitude),
-			ylabel="Template Sample",
-			xlabel="Detection Sample (1 sample = 1μs)",
+			ylabel="Template origin [μs]",
+			xlabel="Detection origin [μs]",
 			colorbar=:right,
 			colorbar_title="\nCross-correlation",
    			right_margin = 3Plots.mm,
@@ -235,8 +232,8 @@ end
 
 # ╔═╡ Cell order:
 # ╠═aa854f02-46bf-4a2b-b1e9-5fb52b99925c
-# ╟─c2f22858-6d3c-4f92-a05b-659deae566f6
 # ╠═8b4426b8-588b-49ad-83c5-a79ed698d704
+# ╟─c2f22858-6d3c-4f92-a05b-659deae566f6
 # ╟─a86b6c8a-9b90-4388-8208-d257ec6951d2
 # ╠═d47c1cf4-4844-4c66-8a21-b62ad7740dcf
 # ╠═f3f17c65-dab6-46da-83a9-87aad1181524
@@ -251,10 +248,6 @@ end
 # ╟─6ac6cce3-09ae-421a-b502-b5c8807bf555
 # ╠═be090485-7917-464a-8e8c-aec4a2c009d3
 # ╟─6ab4a8da-4613-4004-807f-c36876285ebd
-# ╠═41b0f95e-d806-4167-8199-7392717782f9
-# ╠═95f2bd0b-7d8b-43b9-b2f9-cfa6628ec485
-# ╠═356cc4c2-e565-4847-9286-cfc1f835654d
-# ╠═f07ab63f-dfb4-493c-a40c-6b3363a858c3
 # ╠═298010b3-c34c-40ba-9e1b-b79f7378f1d4
 # ╠═a1fc5e84-48df-45ea-b6a1-0073ed9f8340
 # ╠═c7f0582a-8997-4641-b607-0b95a7f73a6c
@@ -264,15 +257,18 @@ end
 # ╠═be80dd80-d39d-4338-bb76-c644ea9d970c
 # ╠═aa23d53f-8333-4c94-8932-fac99ce9196d
 # ╟─368f7fc1-0afc-439f-905a-76af04e8ca8d
+# ╠═41b0f95e-d806-4167-8199-7392717782f9
 # ╠═342cbcff-5a05-4199-b5b5-6cc0fa70c202
 # ╟─0d122aef-1767-4389-b043-97d07ecef1fe
 # ╟─3cdb79e8-e75a-43cd-a12d-1bffb5a745a0
 # ╠═a7a589fc-4dcc-4137-a423-b8d2e7d41a0e
 # ╟─abb8b867-39c2-40f2-9d7a-f40bacf8f550
 # ╟─7d1f1903-8342-4715-8e88-3e3d063ea5db
-# ╟─666c8d5f-c1c5-4cb4-9364-bf997b18a683
+# ╠═666c8d5f-c1c5-4cb4-9364-bf997b18a683
 # ╠═33bc3279-c65f-47b5-acf4-60853c2bdb91
 # ╟─102e4534-6be4-4436-be36-69726a393253
+# ╠═f07ab63f-dfb4-493c-a40c-6b3363a858c3
+# ╠═356cc4c2-e565-4847-9286-cfc1f835654d
 # ╟─feebcd5f-91c4-4a70-a064-e642e3172614
 # ╟─476101af-0108-4628-9ac1-f233a456a869
 # ╟─3be237b0-9f19-4e9a-aa13-c6355771b8e8
