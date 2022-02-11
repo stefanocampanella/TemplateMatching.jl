@@ -176,8 +176,9 @@ signal = correlatetemplate(collect(values(data)), template, offsets, tolerance)
 
 # ╔═╡ 91924a12-6ee4-4d1b-8c49-9b54142cf733
 let
-	a = max(first(axes(signal, 1)), catalogue[template_num, :sample] - 2t_pre)
-	b = min(last(axes(signal, 1)), catalogue[template_num, :sample] + t_post - t_pre)
+	template_ref = catalogue[template_num, :sample] - t_pre
+	a = max(first(axes(signal, 1)), template_ref - t_pre)
+	b = min(last(axes(signal, 1)), template_ref + t_post)
 	plot(a:b, signal[a:b], label=nothing, dpi=300)
 end
 
@@ -196,11 +197,13 @@ peaks, heights = findpeaks(signal, threshold, reldistance * (t_pre + t_post - 1)
 
 # ╔═╡ 96deaa3d-fc40-466f-bf1b-d8d3dd58dcd4
 md"""
-Peak number $(@bind window_pos Slider(axes(peaks, 1), default=1, show_value=true))
+Peak number $(@bind window_pos Slider(axes(peaks, 1), default=1, show_value=true)) / $(length(peaks))
 """
 
 # ╔═╡ cc0c3e0a-4208-4339-bea1-75396b2778bd
-let plt = plot(ylims=(0.0, 1.0)), scale = round(Int, reldistance * (t_post + t_pre))
+let 
+	plt = plot(ylims=(0.0, 1.0))
+	scale = round(Int, reldistance * (t_post + t_pre - 1))
 	a = max(first(axes(signal, 1)), peaks[window_pos] - scale)
 	b = min(last(axes(signal, 1)), peaks[window_pos] + scale)
 	plot!(plt, a:b, signal[a:b], label=nothing)
@@ -220,7 +223,7 @@ begin
 		output_catalogue[!, s] = getproperty(Dates, r).(datetimes)
 	end
 	output_catalogue.Second = @. Dates.second(datetimes) + 1e-3 * Dates.millisecond(datetimes)
-	output_catalogue.sample = peaks .- t_pre
+	output_catalogue.sample = peaks .+ t_pre
 	output_catalogue.template .= template_num
 	output_catalogue.correlation = heights
 	output_catalogue.relative_magnitude = [magnitude(values(data), template, peak .+ offsets .- t_pre) for peak in peaks]
@@ -283,12 +286,12 @@ histogram(output_catalogue[!, :relative_magnitude], label=nothing)
 # ╠═342cbcff-5a05-4199-b5b5-6cc0fa70c202
 # ╟─0d122aef-1767-4389-b043-97d07ecef1fe
 # ╠═a7a589fc-4dcc-4137-a423-b8d2e7d41a0e
-# ╠═91924a12-6ee4-4d1b-8c49-9b54142cf733
+# ╟─91924a12-6ee4-4d1b-8c49-9b54142cf733
 # ╟─abb8b867-39c2-40f2-9d7a-f40bacf8f550
 # ╟─7d1f1903-8342-4715-8e88-3e3d063ea5db
 # ╠═666c8d5f-c1c5-4cb4-9364-bf997b18a683
 # ╟─96deaa3d-fc40-466f-bf1b-d8d3dd58dcd4
-# ╠═cc0c3e0a-4208-4339-bea1-75396b2778bd
+# ╟─cc0c3e0a-4208-4339-bea1-75396b2778bd
 # ╠═ff450e8c-83ee-4e70-b9f4-31d6e1e99b62
 # ╠═33bc3279-c65f-47b5-acf4-60853c2bdb91
 # ╟─102e4534-6be4-4436-be36-69726a393253
