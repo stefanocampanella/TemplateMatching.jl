@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.18.0
+# v0.17.7
 
 using Markdown
 using InteractiveUtils
@@ -197,7 +197,7 @@ begin
 		df.sample = peaks_vec[n] .+ t_pre
 		df.template .= n
 		df.correlation = heights_vec[n]
-		df.relative_magnitude = [magnitude(values(data), templates_vec[n], peak .+ offsets_vec[n] .- t_pre) for peak in peaks_vec[n]]
+		df.relative_magnitude = [magnitude(values(data), templates_vec[n], peak .+ offsets_vec[n]) for peak in peaks_vec[n]]
 		append!(templatematch_catalogue, df)
 	end
 	templatematch_catalogue
@@ -206,14 +206,20 @@ end
 # ╔═╡ 102e4534-6be4-4436-be36-69726a393253
 md" ## Statistics of the detections "
 
+# ╔═╡ 45ef95ec-c638-4a94-b631-213cf3170fab
+nontemplates = @. !(templatematch_catalogue.correlation > 0.999 && templatematch_catalogue.relative_magnitude ≈ 0.0)
+
 # ╔═╡ feebcd5f-91c4-4a70-a064-e642e3172614
-histogram(templatematch_catalogue[!, :correlation], label=nothing)
+histogram(templatematch_catalogue[nontemplates, :correlation], label=nothing)
 
 # ╔═╡ 476101af-0108-4628-9ac1-f233a456a869
-summarystats(templatematch_catalogue[!, :correlation])
+summarystats(templatematch_catalogue[nontemplates, :correlation])
 
 # ╔═╡ 3be237b0-9f19-4e9a-aa13-c6355771b8e8
-histogram(templatematch_catalogue[!, :relative_magnitude], yaxis=:log, label=nothing)
+histogram(templatematch_catalogue[nontemplates, :relative_magnitude], label=nothing)
+
+# ╔═╡ 7453767a-e8f5-4446-b198-fbe48c992aa5
+summarystats(templatematch_catalogue[nontemplates, :relative_magnitude])
 
 # ╔═╡ 08f3bb2c-c80e-43ff-814b-e17ae5a912dc
 let
@@ -227,7 +233,8 @@ let
 			colorbar=:right,
 			colorbar_title="\nCross-correlation",
    			right_margin = 3Plots.mm,
-		    legend=nothing)
+		    legend=nothing,
+			dpi=500)
 end
 
 # ╔═╡ Cell order:
@@ -269,7 +276,9 @@ end
 # ╟─102e4534-6be4-4436-be36-69726a393253
 # ╠═f07ab63f-dfb4-493c-a40c-6b3363a858c3
 # ╠═356cc4c2-e565-4847-9286-cfc1f835654d
+# ╠═45ef95ec-c638-4a94-b631-213cf3170fab
 # ╟─feebcd5f-91c4-4a70-a064-e642e3172614
 # ╟─476101af-0108-4628-9ac1-f233a456a869
 # ╟─3be237b0-9f19-4e9a-aa13-c6355771b8e8
+# ╟─7453767a-e8f5-4446-b198-fbe48c992aa5
 # ╟─08f3bb2c-c80e-43ff-814b-e17ae5a912dc
