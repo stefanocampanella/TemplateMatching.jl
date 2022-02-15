@@ -5,4 +5,5 @@ scratch/*
 *.jl.cov
 *.jl.mem
 /Manifest.toml
+/notebooks/Manifest.toml
 /docs/build/

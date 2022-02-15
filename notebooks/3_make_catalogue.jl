@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.17.7
+# v0.18.0
 
 using Markdown
 using InteractiveUtils
@@ -69,24 +69,25 @@ starttime = DateTime(2021, 01, 12, 20, 25, 30)
 # ╔═╡ 5d5f3ca7-260d-4dbb-bde1-59f2bd58c0c9
 begin
 	columns = [:Year, :Month, :Day, :Hour, :Minute, :Second, :North, :East, :Up]
-	catalogue = CSV.read(cataloguepath, DataFrame, select=columns)
-	sec = floor.(Int, catalogue.Second)
-	usec = round.(Int, 1e6 * (catalogue.Second - sec))
-	instants = @. usec + 1_000_000 * (sec + 60 * catalogue.Minute + 3600 * catalogue.Hour + 86_400 * Dates.totaldays(catalogue.Year, catalogue.Month, catalogue.Day))
-	catalogue.sample = @. instants - Microsecond(starttime.instant.periods).value
+	df = CSV.read(cataloguepath, DataFrame, select=columns)
+	sec = floor.(Int, df.Second)
+	usec = round.(Int, 1e3 * (df.Second - sec))
+	catalogue = DataFrame()
+	catalogue.datetime = DateTime.(df.Year, df.Month, df.Day, df.Hour, df.Minute, sec, usec)
+	catalogue.sample = map(x -> 1000 * x.value, @. (catalogue.datetime - starttime))
+	catalogue.north = df.North
+	catalogue.east = df.East
+	catalogue.up = df.Up
 	catalogue
 end
-
-# ╔═╡ a816019d-529e-44cd-b0da-e6985fadf494
-catalogue[!, [:sample, :North, :East, :Up]]
 
 # ╔═╡ 6ac6cce3-09ae-421a-b502-b5c8807bf555
 md"## Reading Sensors Positions"
 
 # ╔═╡ be090485-7917-464a-8e8c-aec4a2c009d3
 begin
-	sensors_positions = CSV.read("../data/2021-01-12_20-25-30/passive-xyz.csv", DataFrame, header=[:North, :East, :Up])
-	for s = [:North, :East, :Up]
+	sensors_positions = CSV.read("../data/2021-01-12_20-25-30/passive-xyz.csv", DataFrame, header=[:north, :east, :up])
+	for s = [:north, :east, :up]
 		sensors_positions[!, s] .*= 100
 	end
 	sensors_positions.sensor = axes(sensors_positions, 1) .- 1
@@ -102,7 +103,7 @@ begin
 	displacements_vec = DataFrame[]
 	for n in axes(catalogue, 1)
 		displacements = DataFrame()
-		for s in [:North, :East, :Up]
+		for s in [:north, :east, :up]
 			displacements[!, s] = sensors_positions[!, s] .- catalogue[n, s]
 		end
 		push!(displacements_vec, displacements)
@@ -111,7 +112,7 @@ begin
 end
 
 # ╔═╡ a1fc5e84-48df-45ea-b6a1-0073ed9f8340
-distances_vec = [hypot.(displacements[!, :North], displacements[!, :East], displacements[!, :Up]) for displacements in displacements_vec]
+distances_vec = [hypot.(displacements[!, :north], displacements[!, :east], displacements[!, :up]) for displacements in displacements_vec]
 
 # ╔═╡ c7f0582a-8997-4641-b607-0b95a7f73a6c
 v_p = 0.67345 # in cm/us
@@ -162,7 +163,7 @@ begin
 end
 
 # ╔═╡ abb8b867-39c2-40f2-9d7a-f40bacf8f550
-md" ## Finding peaks"
+md" ## Finding peaks and Saving Catalogue"
 
 # ╔═╡ 7d1f1903-8342-4715-8e88-3e3d063ea5db
 md"""
@@ -188,12 +189,7 @@ begin
 	templatematch_catalogue = DataFrame()
 	for n = eachindex(templates_vec)
 		df = DataFrame()
-		df.DateTime = @. starttime + Microsecond(peaks_vec[n] + t_pre)
-		for (r, s) in [(:year, :Year), (:month, :Month), (:day, :Day), (:hour, :Hour), (:minute, :Minute)]
-			df[!, s] = getproperty(Dates, r).(df.DateTime)
-		end
-
-		df.Second = @. Dates.second(df.DateTime) + 1e-3 * Dates.millisecond(df.DateTime)
+		df.datetime = @. starttime + Microsecond(peaks_vec[n] + t_pre)
 		df.sample = peaks_vec[n] .+ t_pre
 		df.template .= n
 		df.correlation = heights_vec[n]
@@ -202,6 +198,9 @@ begin
 	end
 	templatematch_catalogue
 end
+
+# ╔═╡ 3784a5b2-8621-4bac-87a1-4decc25cf4f5
+CSV.write("../data/2021-01-12_20-25-30/templatematch.csv", templatematch_catalogue)
 
 # ╔═╡ 102e4534-6be4-4436-be36-69726a393253
 md" ## Statistics of the detections "
@@ -237,6 +236,9 @@ let
 			dpi=500)
 end
 
+# ╔═╡ b7a6105e-40ac-4a3c-b5a8-aa6ed4bea14e
+combine(groupby(templatematch_catalogue[templatematch_catalogue.sample .< 100000, :], :template), nrow => :count)
+
 # ╔═╡ Cell order:
 # ╠═aa854f02-46bf-4a2b-b1e9-5fb52b99925c
 # ╠═8b4426b8-588b-49ad-83c5-a79ed698d704
@@ -251,7 +253,6 @@ end
 # ╟─b62d7318-3a6d-4442-b6cc-3166b87dff8a
 # ╠═96cf6e3b-1c2b-49f6-979d-0fce28a55a06
 # ╠═5d5f3ca7-260d-4dbb-bde1-59f2bd58c0c9
-# ╠═a816019d-529e-44cd-b0da-e6985fadf494
 # ╟─6ac6cce3-09ae-421a-b502-b5c8807bf555
 # ╠═be090485-7917-464a-8e8c-aec4a2c009d3
 # ╟─6ab4a8da-4613-4004-807f-c36876285ebd
@@ -273,6 +274,7 @@ end
 # ╟─7d1f1903-8342-4715-8e88-3e3d063ea5db
 # ╠═666c8d5f-c1c5-4cb4-9364-bf997b18a683
 # ╠═33bc3279-c65f-47b5-acf4-60853c2bdb91
+# ╠═3784a5b2-8621-4bac-87a1-4decc25cf4f5
 # ╟─102e4534-6be4-4436-be36-69726a393253
 # ╠═f07ab63f-dfb4-493c-a40c-6b3363a858c3
 # ╠═356cc4c2-e565-4847-9286-cfc1f835654d
@@ -282,3 +284,4 @@ end
 # ╟─3be237b0-9f19-4e9a-aa13-c6355771b8e8
 # ╟─7453767a-e8f5-4446-b198-fbe48c992aa5
 # ╟─08f3bb2c-c80e-43ff-814b-e17ae5a912dc
+# ╠═b7a6105e-40ac-4a3c-b5a8-aa6ed4bea14e

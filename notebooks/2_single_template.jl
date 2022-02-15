@@ -75,26 +75,25 @@ starttime = DateTime(2021, 01, 12, 20, 25, 30)
 # ╔═╡ 5d5f3ca7-260d-4dbb-bde1-59f2bd58c0c9
 begin
 	columns = [:Year, :Month, :Day, :Hour, :Minute, :Second, :North, :East, :Up]
-	catalogue = CSV.read(cataloguepath, DataFrame, select=columns)
-	sec = floor.(Int, catalogue.Second)
-	usec = round.(Int, 1e6 * (catalogue.Second - sec))
-	instants = @. usec + 1_000_000 * (sec + 60 * catalogue.Minute + 3600 * catalogue.Hour + 86_400 * Dates.totaldays(catalogue.Year, catalogue.Month, catalogue.Day))
-	catalogue.sample = @. instants - Microsecond(starttime.instant.periods).value
-	catalogue
+	df = CSV.read(cataloguepath, DataFrame, select=columns)
+	sec = floor.(Int, df.Second)
+	usec = round.(Int, 1e3 * (df.Second - sec))
+	templates = DataFrame()
+	templates.datetime = DateTime.(df.Year, df.Month, df.Day, df.Hour, df.Minute, sec, usec)
+	templates.sample = map(x -> 1000 * x.value, @. (templates.datetime - starttime))
+	templates.north = df.North
+	templates.east = df.East
+	templates.up = df.Up
+	templates
 end
-
-# ╔═╡ a816019d-529e-44cd-b0da-e6985fadf494
-catalogue[!, [:sample, :North, :East, :Up]]
 
 # ╔═╡ 6ac6cce3-09ae-421a-b502-b5c8807bf555
 md"## Reading Sensors Positions"
 
 # ╔═╡ be090485-7917-464a-8e8c-aec4a2c009d3
 begin
-	sensors_positions = CSV.read("../data/2021-01-12_20-25-30/passive-xyz.csv", DataFrame, header=[:North, :East, :Up])
-	for s = [:North, :East, :Up]
-		sensors_positions[!, s] .*= 100
-	end
+	sensors_positions = CSV.read("../data/2021-01-12_20-25-30/passive-xyz.csv", DataFrame, header=[:north, :east, :up])
+	sensors_positions .*= 100
 	sensors_positions.sensor = axes(sensors_positions, 1) .- 1
 	filter!(r -> r.sensor in keys(data), sensors_positions)
 	sensors_positions
@@ -104,22 +103,19 @@ end
 md" ## Preparing a single template"
 
 # ╔═╡ fe42e7e6-2c56-4f11-aae6-ec06ad7a219f
-md"""template number: $(@bind template_num Select(1:nrow(catalogue), default=116))"""
-
-# ╔═╡ 726a60e7-9b74-4c6e-afdc-abdc151d9583
-event_coordinates = Vector(catalogue[template_num, [:North, :East, :Up]])
+md"""template number: $(@bind template_num Select(1:nrow(templates), default=116))"""
 
 # ╔═╡ 298010b3-c34c-40ba-9e1b-b79f7378f1d4
 begin
 	displacement = DataFrame()
-	for s in [:North, :East, :Up]
-		displacement[!, s] = sensors_positions[!, s] .- catalogue[template_num, s]
+	for s in [:north, :east, :up]
+		displacement[!, s] = sensors_positions[!, s] .- templates[template_num, s]
 	end
 	displacement
 end
 
 # ╔═╡ a1fc5e84-48df-45ea-b6a1-0073ed9f8340
-distances = hypot.(displacement[!, :North], displacement[!, :East], displacement[!, :Up])
+distances = hypot.(displacement[!, :north], displacement[!, :east], displacement[!, :up])
 
 # ╔═╡ c7f0582a-8997-4641-b607-0b95a7f73a6c
 v_p = 0.67345 # in cm/us
@@ -128,7 +124,7 @@ v_p = 0.67345 # in cm/us
 offsets = @. round(Int, distances / v_p)
 
 # ╔═╡ cd5f912a-fafb-4947-bd70-318151c2c49c
-shifts = catalogue[template_num, :sample] .+ offsets
+shifts = templates[template_num, :sample] .+ offsets
 
 # ╔═╡ 033473d3-6958-4e7b-8c95-a9e15d882118
 md"""
@@ -141,13 +137,14 @@ Template post:$(@bind t_post Slider(0:400, default=200, show_value=true))
 cuts = [shift - t_pre: shift + t_post for shift in shifts]
 
 # ╔═╡ aa23d53f-8333-4c94-8932-fac99ce9196d
-template = [view(series, cut) for (series, cut) in zip(values(data), cuts)]
+template_data = [view(series, cut) for (series, cut) in zip(values(data), cuts)]
 
 # ╔═╡ 4ef908f4-d8dc-4159-97ad-fc8d4621a652
 let
-	xlim = minimum(first(axes(series, 1)) for series in template), maximum(last(axes(series, 1)) for series in template)
+	template_aligned = OffsetVector.(template_data, shifts)
+	xlim = minimum(first(axes(series, 1)) for series in template_aligned), maximum(last(axes(series, 1)) for series in template_aligned)
 	plots = []
-	for (nch, series, shift, cut) = zip(keys(data), template, shifts, cuts)
+	for (nch, series) = zip(keys(data), template_aligned)
 		ylim = minimum(series), maximum(series)
 		push!(plots, 
 			  plot(axes(series, 1), series;
@@ -159,7 +156,7 @@ let
 				   ticks=false,
 				   label=nothing))
 	end
-	numchannels = length(template)
+	numchannels = length(template_data)
 	plot(plots..., layout=(numchannels, 1), size=(800, 100numchannels), dpi=300)
 end
 
@@ -172,11 +169,11 @@ tolerance $(@bind tolerance Slider(0:10, default=5, show_value=true))
 """
 
 # ╔═╡ a7a589fc-4dcc-4137-a423-b8d2e7d41a0e
-signal = correlatetemplate(collect(values(data)), template, offsets, tolerance)
+signal = correlatetemplate(collect(values(data)), template_data, offsets, tolerance)
 
 # ╔═╡ 91924a12-6ee4-4d1b-8c49-9b54142cf733
 let
-	template_ref = catalogue[template_num, :sample] - t_pre
+	template_ref = templates[template_num, :sample] - t_pre
 	a = max(first(axes(signal, 1)), template_ref - t_pre)
 	b = min(last(axes(signal, 1)), template_ref + t_post)
 	plot(a:b, signal[a:b], label=nothing, dpi=300)
@@ -212,22 +209,49 @@ let
 	plt
 end
 
+# ╔═╡ 6d6d27c9-3b1a-4646-8420-61a775f7842f
+let 
+	peak = peaks[window_pos]
+	peak_start = peak - div(t_pre, 2)
+	peak_stop = peak + (t_pre + t_post - 1) + div(t_post, 2)
+	data_start = minimum(series -> first(axes(series, 1)), values(data))
+	data_stop = maximum(series -> last(axes(series, 1)), values(data))
+	xlim = max(data_start, peak_start), min(data_stop, peak_stop)
+	plots = []
+	for (n, channel_num) = enumerate(keys(data))
+		series_start = 	max(first(axes(data[channel_num], 1)), peak_start)
+		series_stop = min(last(axes(data[channel_num], 1)), peak_stop)
+		data_series = OffsetVector(view(data[channel_num], series_start:series_stop), series_start:series_stop)
+		template_aligned = OffsetVector(template_data[n], peak .+ offsets[n])
+		ylim = extrema([OffsetArrays.no_offset_view(data_series); OffsetArrays.no_offset_view(template_data[n])])
+		push!(plots,
+			  plot([axes(data_series, 1), axes(template_aligned, 1)], 
+				   [data_series, template_aligned];
+				   xlim,
+				   ylim,
+				   title="Channel $channel_num",
+				   titlealign=:left,
+				   showaxis=false,
+				   ticks=false,
+				   label=nothing))
+	end
+	numchannels = length(template_data)
+	plot(plots..., layout=(numchannels, 1), size=(800, 100numchannels), dpi=300)
+end
+
 # ╔═╡ ff450e8c-83ee-4e70-b9f4-31d6e1e99b62
-catalogue[template_num, [:Year, :Month, :Day, :Hour, :Minute, :Second, :sample]]
+templates[template_num, :]
 
 # ╔═╡ 33bc3279-c65f-47b5-acf4-60853c2bdb91
 begin
-	datetimes = @. starttime + Microsecond(peaks - t_pre)
-	output_catalogue = DataFrame()
-	for (r, s) in [(:year, :Year), (:month, :Month), (:day, :Day), (:hour, :Hour), (:minute, :Minute)]
-		output_catalogue[!, s] = getproperty(Dates, r).(datetimes)
-	end
-	output_catalogue.Second = @. Dates.second(datetimes) + 1e-3 * Dates.millisecond(datetimes)
-	output_catalogue.sample = peaks .+ t_pre
-	output_catalogue.template .= template_num
-	output_catalogue.correlation = heights
-	output_catalogue.relative_magnitude = [magnitude(values(data), template, peak .+ offsets .- t_pre) for peak in peaks]
-	output_catalogue
+	catalogue = DataFrame()
+	samples = peaks .+ t_pre
+	catalogue.datetimes = datetimes = @. starttime + Microsecond(samples)
+	catalogue.sample = samples	
+	catalogue.template .= template_num
+	catalogue.correlation = heights
+	catalogue.relative_magnitude = [magnitude(values(data), template_data, peak .+ offsets) for peak in peaks]
+	catalogue
 end
 
 # ╔═╡ 102e4534-6be4-4436-be36-69726a393253
@@ -240,13 +264,13 @@ histogram(collect(signal), label=nothing)
 summarystats(collect(signal))
 
 # ╔═╡ feebcd5f-91c4-4a70-a064-e642e3172614
-histogram(output_catalogue[!, :correlation], label=nothing)
+histogram(catalogue[!, :correlation], label=nothing)
 
 # ╔═╡ 476101af-0108-4628-9ac1-f233a456a869
-summarystats(output_catalogue[!, :correlation])
+summarystats(catalogue[!, :correlation])
 
 # ╔═╡ 3be237b0-9f19-4e9a-aa13-c6355771b8e8
-histogram(output_catalogue[!, :relative_magnitude], label=nothing)
+histogram(catalogue[!, :relative_magnitude], label=nothing)
 
 # ╔═╡ Cell order:
 # ╠═aa854f02-46bf-4a2b-b1e9-5fb52b99925c
@@ -262,7 +286,6 @@ histogram(output_catalogue[!, :relative_magnitude], label=nothing)
 # ╟─b62d7318-3a6d-4442-b6cc-3166b87dff8a
 # ╠═96cf6e3b-1c2b-49f6-979d-0fce28a55a06
 # ╠═5d5f3ca7-260d-4dbb-bde1-59f2bd58c0c9
-# ╠═a816019d-529e-44cd-b0da-e6985fadf494
 # ╟─6ac6cce3-09ae-421a-b502-b5c8807bf555
 # ╠═be090485-7917-464a-8e8c-aec4a2c009d3
 # ╟─6ab4a8da-4613-4004-807f-c36876285ebd
@@ -270,7 +293,6 @@ histogram(output_catalogue[!, :relative_magnitude], label=nothing)
 # ╠═95f2bd0b-7d8b-43b9-b2f9-cfa6628ec485
 # ╠═356cc4c2-e565-4847-9286-cfc1f835654d
 # ╟─fe42e7e6-2c56-4f11-aae6-ec06ad7a219f
-# ╠═726a60e7-9b74-4c6e-afdc-abdc151d9583
 # ╠═730340bb-8176-4282-8559-8d60b1d28d57
 # ╠═f07ab63f-dfb4-493c-a40c-6b3363a858c3
 # ╠═298010b3-c34c-40ba-9e1b-b79f7378f1d4
@@ -292,6 +314,7 @@ histogram(output_catalogue[!, :relative_magnitude], label=nothing)
 # ╠═666c8d5f-c1c5-4cb4-9364-bf997b18a683
 # ╟─96deaa3d-fc40-466f-bf1b-d8d3dd58dcd4
 # ╟─cc0c3e0a-4208-4339-bea1-75396b2778bd
+# ╟─6d6d27c9-3b1a-4646-8420-61a775f7842f
 # ╠═ff450e8c-83ee-4e70-b9f4-31d6e1e99b62
 # ╠═33bc3279-c65f-47b5-acf4-60853c2bdb91
 # ╟─102e4534-6be4-4436-be36-69726a393253
