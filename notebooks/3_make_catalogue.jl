@@ -236,9 +236,6 @@ let
 			dpi=500)
 end
 
-# ╔═╡ b7a6105e-40ac-4a3c-b5a8-aa6ed4bea14e
-combine(groupby(templatematch_catalogue[templatematch_catalogue.sample .< 100000, :], :template), nrow => :count)
-
 # ╔═╡ Cell order:
 # ╠═aa854f02-46bf-4a2b-b1e9-5fb52b99925c
 # ╠═8b4426b8-588b-49ad-83c5-a79ed698d704
@@ -284,4 +281,3 @@ combine(groupby(templatematch_catalogue[templatematch_catalogue.sample .< 100000
 # ╟─3be237b0-9f19-4e9a-aa13-c6355771b8e8
 # ╟─7453767a-e8f5-4446-b198-fbe48c992aa5
 # ╟─08f3bb2c-c80e-43ff-814b-e17ae5a912dc
-# ╠═b7a6105e-40ac-4a3c-b5a8-aa6ed4bea14e
