@@ -33,38 +33,32 @@ using JLD2
 # ╔═╡ f07ab63f-dfb4-493c-a40c-6b3363a858c3
 using Plots
 
+# ╔═╡ 58ba75d2-ab31-43b5-a266-df944fd79530
+using StatsBase
+
 # ╔═╡ 746daaba-22c5-4a47-822a-3a13e687cd37
 md"# Data Preparation"
 
 # ╔═╡ cc3e29fc-b063-4421-a2a2-4fe29cb46abe
 @bind dirpath TextField(default="../data/2021-01-12_20-25-30")
 
-# ╔═╡ 88625f5f-6e3d-4688-81ae-d6feb3646f8b
-samplefreq = 10_000 # in KHz
-
-# ╔═╡ a1e052ff-7660-4cc7-b9f9-9301187a7b3f
-readdir(dirpath, join=true)
-
-# ╔═╡ 7485d3e4-5413-4934-85e4-b01ae5596258
-listbins(dirpath) = filter(path -> endswith(path, ".bin"), readdir(dirpath, join=true))
-
 # ╔═╡ d07a8c82-7341-4629-b772-b3d8b5324e66
-filepaths = listbins(dirpath)
+filepaths = filter(path -> endswith(path, ".bin"), readdir(dirpath, join=true))
 
 # ╔═╡ 719cdc2e-72db-4790-b606-12c797dbdf76
-function convertdata(rawdata)
-	data = (convert(Vector{Float32}, ntoh.(reinterpret(Int16, rawdata))))
+function convertdata(rawdata, eltype::Type{T}) where T <: AbstractFloat
+	data = (convert(Vector{eltype}, ntoh.(reinterpret(Int16, rawdata))))
 	data[1:2:end], data[2:2:end]
 end
 
 # ╔═╡ 775f53db-5c7c-481a-b1c7-08c6fc49e08d
-function readbins(filepaths, nb)
+function readbins(filepaths, nb, eltype::Type{T}) where T <: AbstractFloat
 	re = r".+_ch(?P<first_channel_num>[0-9]+)&(?P<second_channel_num>[0-9]+)\.bin"
-	data = Dict{Int, Vector{Float32}}()
+	data = Dict{Int, Vector{eltype}}()
 	for filepath in filepaths
 		m = match(re, filepath)
 		rawdata = read(filepath, nb)
-		first_channel_data, second_channel_data = convertdata(rawdata)
+		first_channel_data, second_channel_data = convertdata(rawdata, eltype)
 		data[parse(Int, m[:first_channel_num])] = first_channel_data
 		data[parse(Int, m[:second_channel_num])] = second_channel_data
 	end
@@ -78,11 +72,11 @@ md"""
 
 Enable? $(@bind tofilter CheckBox(default=true))
 
-Lowpass frequency (kHz) $(@bind lopassfreq Slider(10:10:200, default=100, show_value=true))
+Lowpass frequency (kHz) $(@bind lopassfreq Slider(1:2000, default=50, show_value=true))
 
-Highpass frequency (kHz) $(@bind hipassfreq Slider(10:10:800, default=400, show_value=true))
+Highpass frequency (kHz) $(@bind hipassfreq Slider(1:2000, default=600, show_value=true))
 
-Number of poles in Butterworth filter $(@bind bwpolesnum NumberField(1:10, default=6))
+Number of poles in Butterworth filter $(@bind bwpolesnum NumberField(1:10, default=4))
 """
 
 # ╔═╡ 92061d02-57f6-4073-8fea-726a3d82a153
@@ -90,17 +84,25 @@ md"""## Resample
 
 Enable? $(@bind toresample CheckBox(default=true))
 
-Decimation factor $(@bind resamplefactor Slider(2:25, default=10, show_value=true))
+Decimation factor $(@bind resamplefactor Slider(2:25, default=5, show_value=true))
 """
+
+# ╔═╡ 88625f5f-6e3d-4688-81ae-d6feb3646f8b
+samplefreq = 10_000 # in KHz
 
 # ╔═╡ 885e5df3-aa89-4009-88da-23f8e05ca86a
 begin
-	data = readbins(filepaths, typemax(Int))
+	data = readbins(filepaths, typemax(Int), Float64)
 	if (tofilter && hipassfreq > lopassfreq)
 		responsetype = Bandpass(lopassfreq, hipassfreq, fs=samplefreq)
 		designmethod = Butterworth(bwpolesnum)
 		Threads.@threads for n in collect(keys(data))
-			data[n] = filtfilt(digitalfilter(responsetype, designmethod), data[n])
+			ys = data[n]
+			xs = axes(data[n], 1)
+			β = (mean(xs .* ys) - mean(xs) * mean(ys)) / std(xs, corrected=false)
+			α = mean(ys) - β * mean(xs)
+			δs = @. ys - α - β * xs
+			data[n] = filtfilt(digitalfilter(responsetype, designmethod), δs)
 		end
 	end
 	if toresample
@@ -113,19 +115,20 @@ end
 
 # ╔═╡ 67b94e20-6332-4993-bdef-8cc29e51b1ea
 md"""
-Plot scale $(@bind plotnpts Slider(100:100:5000, default=1000, show_value=true))
+Plot x-range $(@bind npts Slider(100:100:5000, default=1000, show_value=true))
 
-Plot window position $(@bind plotpos Slider(0:0.01:100, default=50, show_value=true))
+Plot window position $(@bind center_percent Slider(0:0.01:100, default=50, show_value=true))
 """
 
-# ╔═╡ c717e19e-8007-4f45-ada5-e2879b238e0d
-function plotstream(data, npts, center)
+# ╔═╡ dd071ca8-ff4e-4af2-9d44-48e7947c3431
+let 
+	center = round(Int, (center_percent / 100) * minimum(size(series, 1) for (_, series) in data)) 
 	plots = []
 	numchannels = length(data)
 	for (nch, series) in data
 		a = max(first(axes(series, 1)), center - div(npts, 2))
 		b = min(last(axes(series, 1)), center + div(npts, 2))
-		ylim = extrema(series)
+		ylim = extrema(view(series, a:b))
 		push!(plots, plot(a:b, view(series, a:b),
 			  ylim=ylim,
 			  title="Channel $nch",
@@ -135,11 +138,6 @@ function plotstream(data, npts, center)
 			  label=nothing))
 	end
 	plot(plots..., layout=(numchannels, 1), size=(800, 100numchannels))
-end
-
-# ╔═╡ dd071ca8-ff4e-4af2-9d44-48e7947c3431
-let center = round(Int, (plotpos / 100) * minimum(size(series, 1) for (_, series) in data)) 
-	plotstream(data, plotnpts, center)
 end
 
 # ╔═╡ 60930b7e-c200-4219-929b-58e33cd8b939
@@ -177,17 +175,15 @@ save(outputpath, "data", filter(!(x -> x.first in bad_channels), data))
 # ╠═8382586d-170f-45fd-82eb-e1b526b2cf1c
 # ╠═f07ab63f-dfb4-493c-a40c-6b3363a858c3
 # ╠═cc3e29fc-b063-4421-a2a2-4fe29cb46abe
-# ╠═88625f5f-6e3d-4688-81ae-d6feb3646f8b
-# ╠═a1e052ff-7660-4cc7-b9f9-9301187a7b3f
-# ╠═7485d3e4-5413-4934-85e4-b01ae5596258
 # ╠═d07a8c82-7341-4629-b772-b3d8b5324e66
 # ╠═719cdc2e-72db-4790-b606-12c797dbdf76
 # ╠═775f53db-5c7c-481a-b1c7-08c6fc49e08d
 # ╟─ba1ac3d7-8376-4955-aeee-1d9daf83964e
-# ╟─92061d02-57f6-4073-8fea-726a3d82a153
-# ╟─885e5df3-aa89-4009-88da-23f8e05ca86a
+# ╠═92061d02-57f6-4073-8fea-726a3d82a153
+# ╠═88625f5f-6e3d-4688-81ae-d6feb3646f8b
+# ╠═58ba75d2-ab31-43b5-a266-df944fd79530
+# ╠═885e5df3-aa89-4009-88da-23f8e05ca86a
 # ╟─67b94e20-6332-4993-bdef-8cc29e51b1ea
-# ╟─c717e19e-8007-4f45-ada5-e2879b238e0d
 # ╟─dd071ca8-ff4e-4af2-9d44-48e7947c3431
 # ╟─60930b7e-c200-4219-929b-58e33cd8b939
 # ╟─a4728746-a8a0-4bbb-9e9e-228eee132fdf
