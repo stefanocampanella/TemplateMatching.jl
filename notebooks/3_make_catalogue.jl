@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.18.0
+# v0.18.1
 
 using Markdown
 using InteractiveUtils
@@ -57,24 +57,45 @@ md"""Path of the JLD2 file containing continuous data: $(@bind datapath TextFiel
 # ╔═╡ f3f17c65-dab6-46da-83a9-87aad1181524
 data = load(datapath, "data")
 
+# ╔═╡ f7e0f70d-4069-4039-90b6-d3da559bdcb1
+samplefreq = 2 # MHz
+
 # ╔═╡ 57b35604-727b-4eac-bcbd-ea302e4c79a2
 md"## Reading events catalogue"
 
 # ╔═╡ b62d7318-3a6d-4442-b6cc-3166b87dff8a
-md"""Path of the CSV catalogue $(@bind cataloguepath TextField(default="../data/2021-01-12_20-25-30/cat2021-01-12_20-25-30_gab6_.2021.5.10.23.37.11.3267.csv"))"""
+md"""Path of the CSV catalogue $(@bind cataloguepath TextField(default="../data/2021-01-12_20-25-30/cat.csv"))"""
+
+# ╔═╡ d5beeb75-7ca6-4f28-a63b-6e3070fb4c73
+begin 
+	import Base.+, Base.show
+	
+	+(x::Dates.UTInstant{Microsecond}, d::Microsecond) = Dates.UTInstant(x.periods + d)
+
+	function show(io::IO, ::MIME"text/plain", x::Dates.UTInstant{Microsecond})
+		date = DateTime(Dates.UTM(round(Int, 1e-3 * x.periods.value)))
+		show(io, MIME"text/plain"(), date)
+	end
+end
+
+# ╔═╡ 1bf27aad-b754-4acc-b08d-fe1a86791de8
+function DateTimeMicrosecond(y, m, d, h, mi, s, us)
+	rata = us + 1_000_000 * (s + 60mi + 3600h + 86400 * Dates.totaldays(y, m, d))
+	Dates.UTInstant{Microsecond}(Microsecond(rata))
+end
 
 # ╔═╡ 96cf6e3b-1c2b-49f6-979d-0fce28a55a06
-starttime = DateTime(2021, 01, 12, 20, 25, 30)
+starttime = DateTimeMicrosecond(2021, 01, 12, 20, 25, 30, 0)
 
 # ╔═╡ 5d5f3ca7-260d-4dbb-bde1-59f2bd58c0c9
 begin
 	columns = [:Year, :Month, :Day, :Hour, :Minute, :Second, :North, :East, :Up]
 	df = CSV.read(cataloguepath, DataFrame, select=columns)
 	sec = floor.(Int, df.Second)
-	usec = round.(Int, 1e3 * (df.Second - sec))
+	usec = round.(Int, 1e6 * (df.Second - sec))
 	catalogue = DataFrame()
-	catalogue.datetime = DateTime.(df.Year, df.Month, df.Day, df.Hour, df.Minute, sec, usec)
-	catalogue.sample = map(x -> 1000 * x.value, @. (catalogue.datetime - starttime))
+	catalogue.datetime = DateTimeMicrosecond.(df.Year, df.Month, df.Day, df.Hour, df.Minute, sec, usec)
+	catalogue.sample = map(x -> round(Int, x.value * samplefreq), catalogue.datetime .- starttime)
 	catalogue.north = df.North
 	catalogue.east = df.East
 	catalogue.up = df.Up
@@ -118,16 +139,16 @@ distances_vec = [hypot.(displacements[!, :north], displacements[!, :east], displ
 v_p = 0.67345 # in cm/us
 
 # ╔═╡ 074983c0-2747-4b09-a0c0-4d4adba24c0b
-offsets_vec = [@. round(Int, distances / v_p) for distances in distances_vec]
+offsets_vec = [@. round(Int, samplefreq * (distances / v_p)) for distances in distances_vec]
 
 # ╔═╡ cd5f912a-fafb-4947-bd70-318151c2c49c
 shifts_vec = [catalogue[n, :sample] .+ offsets_vec[n] for n in axes(catalogue, 1)]
 
 # ╔═╡ 033473d3-6958-4e7b-8c95-a9e15d882118
 md"""
-Template pre:$(@bind t_pre Slider(0:400, default=200, show_value=true))
+Template pre:$(@bind t_pre Slider(0:1000, default=100, show_value=true))
 
-Template post:$(@bind t_post Slider(0:400, default=200, show_value=true))
+Template post:$(@bind t_post Slider(0:1000, default=500, show_value=true))
 """
 
 # ╔═╡ be80dd80-d39d-4338-bb76-c644ea9d970c
@@ -189,7 +210,7 @@ begin
 	templatematch_catalogue = DataFrame()
 	for n = eachindex(templates_vec)
 		df = DataFrame()
-		df.datetime = @. starttime + Microsecond(peaks_vec[n] + t_pre)
+		df.datetime = @. starttime + Microsecond(peaks_vec[n])
 		df.sample = peaks_vec[n] .+ t_pre
 		df.template .= n
 		df.correlation = heights_vec[n]
@@ -243,11 +264,14 @@ end
 # ╟─a86b6c8a-9b90-4388-8208-d257ec6951d2
 # ╠═d47c1cf4-4844-4c66-8a21-b62ad7740dcf
 # ╠═f3f17c65-dab6-46da-83a9-87aad1181524
+# ╠═f7e0f70d-4069-4039-90b6-d3da559bdcb1
 # ╟─57b35604-727b-4eac-bcbd-ea302e4c79a2
 # ╠═3c07c33b-7f91-4e2d-a27a-09a8924f328c
 # ╠═b59dd2c0-4c3e-4c3d-a4d4-f8da9dcbe286
 # ╠═76e2e659-c708-4a08-8263-def6c3dfa930
 # ╟─b62d7318-3a6d-4442-b6cc-3166b87dff8a
+# ╠═1bf27aad-b754-4acc-b08d-fe1a86791de8
+# ╠═d5beeb75-7ca6-4f28-a63b-6e3070fb4c73
 # ╠═96cf6e3b-1c2b-49f6-979d-0fce28a55a06
 # ╠═5d5f3ca7-260d-4dbb-bde1-59f2bd58c0c9
 # ╟─6ac6cce3-09ae-421a-b502-b5c8807bf555
@@ -258,7 +282,7 @@ end
 # ╠═c7f0582a-8997-4641-b607-0b95a7f73a6c
 # ╠═074983c0-2747-4b09-a0c0-4d4adba24c0b
 # ╠═cd5f912a-fafb-4947-bd70-318151c2c49c
-# ╟─033473d3-6958-4e7b-8c95-a9e15d882118
+# ╠═033473d3-6958-4e7b-8c95-a9e15d882118
 # ╠═be80dd80-d39d-4338-bb76-c644ea9d970c
 # ╠═aa23d53f-8333-4c94-8932-fac99ce9196d
 # ╟─368f7fc1-0afc-439f-905a-76af04e8ca8d

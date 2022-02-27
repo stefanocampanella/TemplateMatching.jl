@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.18.0
+# v0.18.1
 
 using Markdown
 using InteractiveUtils
@@ -104,7 +104,6 @@ begin
 	templates.north = df.North
 	templates.east = df.East
 	templates.up = df.Up
-	templates.mag = df.MAE
 	templates
 end
 
@@ -245,12 +244,14 @@ let
 		series_stop = min(last(axes(data[channel_num], 1)), peak_stop)
 		data_series = OffsetVector(view(data[channel_num], series_start:series_stop), series_start:series_stop)
 		template_aligned = OffsetVector(template_data[n], peak .+ offsets[n])
-		ylim = extrema([OffsetArrays.no_offset_view(data_series); OffsetArrays.no_offset_view(template_data[n])])
+		data_inf, data_sup = extrema(data_series)
+		template_inf, template_sup = extrema(template_data[n])
+		β = (template_sup - template_inf) / (data_sup - data_inf)
 		push!(plots,
 			  plot([axes(data_series, 1), axes(template_aligned, 1)], 
-				   [data_series, template_aligned];
+				   [template_inf .+ β .* (data_series .- data_inf), template_aligned];
 				   xlim,
-				   ylim,
+				   ylim=(template_inf, template_sup),
 				   title="Channel $channel_num",
 				   titlealign=:left,
 				   showaxis=false,
@@ -269,7 +270,7 @@ begin
 	catalogue.sample = samples	
 	catalogue.template .= template_num
 	catalogue.correlation = heights
-	catalogue.mag = [templates[template_num, :mag] + magnitude(values(data), template_data, peak .+ offsets) for peak in peaks]
+	catalogue.rel_mag = [magnitude(values(data), template_data, peak .+ offsets) for peak in peaks]
 	catalogue
 end
 
@@ -289,7 +290,7 @@ histogram(catalogue[!, :correlation], label=nothing)
 summarystats(catalogue[!, :correlation])
 
 # ╔═╡ 3be237b0-9f19-4e9a-aa13-c6355771b8e8
-histogram(catalogue[!, :mag], label=nothing)
+histogram(catalogue[!, :rel_mag], label=nothing)
 
 # ╔═╡ Cell order:
 # ╠═aa854f02-46bf-4a2b-b1e9-5fb52b99925c
