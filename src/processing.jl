@@ -31,40 +31,53 @@ function findpeaks(signal::AbstractVector, threshold::Number, distance::Number)
             end
             if signal[n_ahead] < height
                 midpoint = div(n + n_ahead, 2)
-                if height > threshold
-                    push!(peaks, midpoint)
-                    push!(heights, height)
-                end
+                push!(peaks, midpoint)
+                push!(heights, height)
             end
         end
     end
-    
-    if distance > 0
-        npeaks = length(peaks)
-        tokeep = fill(true, npeaks)
-        for j in sortperm(heights, rev=true)
 
-            if !tokeep[j]
-                continue
-            end
-
-            k = j - 1
-            while k >= 1 && (peaks[j] - peaks[k]) <= distance
-                tokeep[k] = false
-                k -= 1
-            end
-
-            k = j + 1
-            while k <= npeaks && (peaks[k] - peaks[j]) <= distance
-                tokeep[k] = false
-                k += 1
-            end
+    if threshold > 0 || distance > 0
+        tokeep = trues(length(peaks))
+        if threshold > 0
+            tokeep .&= selectbypeaksheight(heights, threshold)
         end
-    
+        if distance > 0
+            tokeep .&= selectbypeaksdistance(peaks, heights, distance)
+        end
         peaks[tokeep], heights[tokeep]
     else
         peaks, heights
     end
+end
+
+function selectbypeaksheight(heights, threshold)
+    heights .> threshold
+end
+
+function selectbypeaksdistance(peaks, heights, distance)
+    npeaks = length(peaks)
+    tokeep = fill(true, npeaks)
+    for j in sortperm(heights, rev=true)
+
+        if !tokeep[j]
+            continue
+        end
+
+        k = j - 1
+        while k >= 1 && (peaks[j] - peaks[k]) <= distance
+            tokeep[k] = false
+            k -= 1
+        end
+
+        k = j + 1
+        while k <= npeaks && (peaks[k] - peaks[j]) <= distance
+            tokeep[k] = false
+            k += 1
+        end
+    end
+
+    tokeep
 end
 
 """

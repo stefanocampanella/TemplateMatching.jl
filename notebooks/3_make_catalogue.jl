@@ -57,9 +57,6 @@ md"""Path of the JLD2 file containing continuous data: $(@bind datapath TextFiel
 # ╔═╡ f3f17c65-dab6-46da-83a9-87aad1181524
 data = load(datapath, "data")
 
-# ╔═╡ f7e0f70d-4069-4039-90b6-d3da559bdcb1
-samplefreq = 2 # MHz
-
 # ╔═╡ 57b35604-727b-4eac-bcbd-ea302e4c79a2
 md"## Reading events catalogue"
 
@@ -87,8 +84,11 @@ end
 # ╔═╡ 96cf6e3b-1c2b-49f6-979d-0fce28a55a06
 starttime = DateTimeMicrosecond(2021, 01, 12, 20, 25, 30, 0)
 
+# ╔═╡ f7e0f70d-4069-4039-90b6-d3da559bdcb1
+samplefreq = 2 # MHz
+
 # ╔═╡ 5d5f3ca7-260d-4dbb-bde1-59f2bd58c0c9
-begin
+catalogue = let
 	columns = [:Year, :Month, :Day, :Hour, :Minute, :Second, :North, :East, :Up]
 	df = CSV.read(cataloguepath, DataFrame, select=columns)
 	sec = floor.(Int, df.Second)
@@ -106,7 +106,7 @@ end
 md"## Reading Sensors Positions"
 
 # ╔═╡ be090485-7917-464a-8e8c-aec4a2c009d3
-begin
+sensors_positions = let
 	sensors_positions = CSV.read("../data/2021-01-12_20-25-30/passive-xyz.csv", DataFrame, header=[:north, :east, :up])
 	for s = [:north, :east, :up]
 		sensors_positions[!, s] .*= 100
@@ -120,7 +120,7 @@ end
 md" ## Preparing the templates"
 
 # ╔═╡ 298010b3-c34c-40ba-9e1b-b79f7378f1d4
-begin
+displacements_vec = let
 	displacements_vec = DataFrame[]
 	for n in axes(catalogue, 1)
 		displacements = DataFrame()
@@ -169,7 +169,7 @@ tolerance $(@bind tolerance Slider(0:10, default=5, show_value=true))
 md"""Path of the JLD2 file containing cross-correlations: $(@bind correlationspath TextField(default="../data/2021-01-12_20-25-30/crosscorrelations.jld2"))"""
 
 # ╔═╡ a7a589fc-4dcc-4137-a423-b8d2e7d41a0e
-begin
+signals_vec = let
 	if isfile(correlationspath)
 		signals_vec = load(correlationspath, "signals_vec")
 	else
@@ -194,7 +194,7 @@ distance (in unit of template length) $(@bind reldistance Slider(0:0.5:5, defaul
 """
 
 # ╔═╡ 666c8d5f-c1c5-4cb4-9364-bf997b18a683
-begin
+peaks_vec, heights_vec = let
 	peaks_vec = similar(signals_vec, Vector{Int})
 	heights_vec = similar(signals_vec, Vector{Float64})
 	Threads.@threads for n = eachindex(signals_vec)
@@ -206,7 +206,7 @@ begin
 end
 
 # ╔═╡ 33bc3279-c65f-47b5-acf4-60853c2bdb91
-begin
+templatematch_catalogue = let
 	templatematch_catalogue = DataFrame()
 	for n = eachindex(templates_vec)
 		df = DataFrame()
@@ -264,15 +264,15 @@ end
 # ╟─a86b6c8a-9b90-4388-8208-d257ec6951d2
 # ╠═d47c1cf4-4844-4c66-8a21-b62ad7740dcf
 # ╠═f3f17c65-dab6-46da-83a9-87aad1181524
-# ╠═f7e0f70d-4069-4039-90b6-d3da559bdcb1
 # ╟─57b35604-727b-4eac-bcbd-ea302e4c79a2
 # ╠═3c07c33b-7f91-4e2d-a27a-09a8924f328c
 # ╠═b59dd2c0-4c3e-4c3d-a4d4-f8da9dcbe286
 # ╠═76e2e659-c708-4a08-8263-def6c3dfa930
-# ╟─b62d7318-3a6d-4442-b6cc-3166b87dff8a
+# ╠═b62d7318-3a6d-4442-b6cc-3166b87dff8a
 # ╠═1bf27aad-b754-4acc-b08d-fe1a86791de8
 # ╠═d5beeb75-7ca6-4f28-a63b-6e3070fb4c73
 # ╠═96cf6e3b-1c2b-49f6-979d-0fce28a55a06
+# ╠═f7e0f70d-4069-4039-90b6-d3da559bdcb1
 # ╠═5d5f3ca7-260d-4dbb-bde1-59f2bd58c0c9
 # ╟─6ac6cce3-09ae-421a-b502-b5c8807bf555
 # ╠═be090485-7917-464a-8e8c-aec4a2c009d3
@@ -304,4 +304,4 @@ end
 # ╟─476101af-0108-4628-9ac1-f233a456a869
 # ╟─3be237b0-9f19-4e9a-aa13-c6355771b8e8
 # ╟─7453767a-e8f5-4446-b198-fbe48c992aa5
-# ╟─08f3bb2c-c80e-43ff-814b-e17ae5a912dc
+# ╠═08f3bb2c-c80e-43ff-814b-e17ae5a912dc

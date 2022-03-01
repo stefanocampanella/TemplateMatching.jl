@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.18.0
+# v0.18.1
 
 using Markdown
 using InteractiveUtils
@@ -36,6 +36,9 @@ using Dates
 # ╔═╡ 95347531-11f3-4a66-ba6c-7ffdc70b7806
 using JLD2
 
+# ╔═╡ 533d8e9e-40ff-4740-bbd9-8199cf0bcef6
+using TemplateMatching
+
 # ╔═╡ f07ab63f-dfb4-493c-a40c-6b3363a858c3
 using Plots
 
@@ -49,7 +52,46 @@ using Printf
 md"## Reading templates catalogue"
 
 # ╔═╡ 2fc4fdfe-81b2-45f1-9ed4-b8ad5bb86ee3
-md"""Path of the CSV templates catalogue $(@bind templatespath TextField(default="../data/2021-01-12_20-25-30/cat2021-01-12_20-25-30_gab6_.2021.5.10.23.37.11.3267.csv"))"""
+md"""Path of the CSV templates catalogue $(@bind templatespath TextField(default="../data/2021-01-12_20-25-30/cat.csv"))"""
+
+# ╔═╡ 60ad8eb3-a313-4dce-82bd-a74a4d6842fd
+begin 
+	import Base.+, Base.show
+	
+	+(x::Dates.UTInstant{Microsecond}, d::Microsecond) = Dates.UTInstant(x.periods + d)
+
+	function show(io::IO, ::MIME"text/plain", x::Dates.UTInstant{Microsecond})
+		date = DateTime(Dates.UTM(round(Int, 1e-3 * x.periods.value)))
+		show(io, MIME"text/plain"(), date)
+	end
+end
+
+# ╔═╡ 74063783-3454-4e4b-95d5-0427edbe9380
+function DateTimeMicrosecond(y, m, d, h, mi, s, us)
+	rata = us + 1_000_000 * (s + 60mi + 3600h + 86400 * Dates.totaldays(y, m, d))
+	Dates.UTInstant{Microsecond}(Microsecond(rata))
+end
+
+# ╔═╡ 171de4ad-485a-4f92-818a-50cfbfa2330b
+starttime = DateTimeMicrosecond(2021, 01, 12, 20, 25, 30, 0)
+
+# ╔═╡ c76f6541-b0e2-4aba-9533-8ab6c23685bb
+samplefreq = 2 # MHz
+
+# ╔═╡ 56c57ae9-5254-4dca-a793-bfdeee9a0ba5
+templates = let
+	columns = [:Year, :Month, :Day, :Hour, :Minute, :Second, :North, :East, :Up]
+	df = CSV.read(templatespath, DataFrame, select=columns)
+	sec = floor.(Int, df.Second)
+	usec = round.(Int, 1e6 * (df.Second - sec))
+	templates = DataFrame()
+	templates.datetime = DateTimeMicrosecond.(df.Year, df.Month, df.Day, df.Hour, df.Minute, sec, usec)
+	templates.sample = map(x -> round(Int, x.value * samplefreq), templates.datetime .- starttime)
+	templates.north = df.North
+	templates.east = df.East
+	templates.up = df.Up
+	templates
+end
 
 # ╔═╡ 6ac6cce3-09ae-421a-b502-b5c8807bf555
 md"## Reading Sensors Positions"
@@ -61,7 +103,7 @@ md"""Path of the JLD2 file containing continuous data: $(@bind datapath TextFiel
 data = load(datapath, "data")
 
 # ╔═╡ be090485-7917-464a-8e8c-aec4a2c009d3
-begin
+sensors_positions = let
 	sensors_positions = CSV.read("../data/2021-01-12_20-25-30/passive-xyz.csv", DataFrame, header=[:north, :east, :up])
 	for s = [:north, :east, :up]
 		sensors_positions[!, s] .*= 100
@@ -78,7 +120,12 @@ md"## Reading template matched catalogue"
 md"""Path of the CSV template-match catalogue $(@bind cataloguepath TextField(default="../data/2021-01-12_20-25-30/templatematch.csv"))"""
 
 # ╔═╡ c46997fc-9ab5-4678-bdd1-6874f77e7bca
-catalogue = CSV.read(cataloguepath, DataFrame)
+catalogue = let
+	df = CSV.read(cataloguepath, DataFrame, select=[:sample, :template, :correlation, :relative_magnitude])
+	sort!(df, :sample)
+	tokeep = TemplateMatching.selectbypeaksdistance(df.sample, df.correlation, 600)
+	df[tokeep, :]
+end
 
 # ╔═╡ 102e4534-6be4-4436-be36-69726a393253
 md" ## Statistics of the detections "
@@ -98,27 +145,9 @@ histogram(catalogue[nontemplates, :relative_magnitude], label=nothing)
 # ╔═╡ 7453767a-e8f5-4446-b198-fbe48c992aa5
 summarystats(catalogue[nontemplates, :relative_magnitude])
 
-# ╔═╡ 96cf6e3b-1c2b-49f6-979d-0fce28a55a06
-starttime = DateTime(2021, 01, 12, 20, 25, 30)
-
-# ╔═╡ 56c57ae9-5254-4dca-a793-bfdeee9a0ba5
-begin
-	columns = [:Year, :Month, :Day, :Hour, :Minute, :Second, :North, :East, :Up]
-	df = CSV.read(templatespath, DataFrame, select=columns)
-	sec = floor.(Int, df.Second)
-	usec = round.(Int, 1e3 * (df.Second - sec))
-	templates = DataFrame()
-	templates.datetime = DateTime.(df.Year, df.Month, df.Day, df.Hour, df.Minute, sec, usec)
-	templates.sample = map(x -> 1000 * x.value, @. (templates.datetime - starttime))
-	templates.north = df.North
-	templates.east = df.East
-	templates.up = df.Up
-	templates
-end
-
 # ╔═╡ 08f3bb2c-c80e-43ff-814b-e17ae5a912dc
-scatter(catalogue[:, :sample],
-		templates[catalogue.template, :sample],
+scatter(catalogue[:, :sample] ./ samplefreq,
+		templates[catalogue.template, :sample] ./ samplefreq,
 		zcolor=catalogue.correlation,
 		c=:heat,
 		markersize=4exp.(catalogue.relative_magnitude),
@@ -131,7 +160,7 @@ scatter(catalogue[:, :sample],
 		dpi=500)
 
 # ╔═╡ 1d576253-f719-4f21-8cc2-e794399a6ad5
-let nframes = 500, size_r = 0.5, alpha_r = 1e-6, data_len = maximum(length, values(data))
+let nframes = 500, size_r = 0.8, alpha_r = 1e-6, data_len = maximum(length, values(data))
 	@gif for n = range(1, data_len, nframes)
 		selection = catalogue[catalogue.sample .<= n, :]
 		if !isempty(selection)
@@ -146,7 +175,7 @@ let nframes = 500, size_r = 0.5, alpha_r = 1e-6, data_len = maximum(length, valu
 					xlim=(0, 25),
 					ylim=(0, 25),
 					zlim=(0, 25),
-					title=@sprintf("%.2f ms", 1e-3n),
+					title=@sprintf("%.2f ms", 1e-3n / samplefreq),
 					legend=nothing)
 		end
 	end
@@ -159,7 +188,11 @@ end
 # ╠═3c07c33b-7f91-4e2d-a27a-09a8924f328c
 # ╠═b59dd2c0-4c3e-4c3d-a4d4-f8da9dcbe286
 # ╠═76e2e659-c708-4a08-8263-def6c3dfa930
-# ╟─2fc4fdfe-81b2-45f1-9ed4-b8ad5bb86ee3
+# ╠═2fc4fdfe-81b2-45f1-9ed4-b8ad5bb86ee3
+# ╠═74063783-3454-4e4b-95d5-0427edbe9380
+# ╠═171de4ad-485a-4f92-818a-50cfbfa2330b
+# ╠═60ad8eb3-a313-4dce-82bd-a74a4d6842fd
+# ╠═c76f6541-b0e2-4aba-9533-8ab6c23685bb
 # ╠═56c57ae9-5254-4dca-a793-bfdeee9a0ba5
 # ╟─6ac6cce3-09ae-421a-b502-b5c8807bf555
 # ╠═95347531-11f3-4a66-ba6c-7ffdc70b7806
@@ -168,6 +201,7 @@ end
 # ╠═be090485-7917-464a-8e8c-aec4a2c009d3
 # ╟─57b35604-727b-4eac-bcbd-ea302e4c79a2
 # ╟─b62d7318-3a6d-4442-b6cc-3166b87dff8a
+# ╠═533d8e9e-40ff-4740-bbd9-8199cf0bcef6
 # ╠═c46997fc-9ab5-4678-bdd1-6874f77e7bca
 # ╟─102e4534-6be4-4436-be36-69726a393253
 # ╠═f07ab63f-dfb4-493c-a40c-6b3363a858c3
@@ -177,7 +211,6 @@ end
 # ╟─476101af-0108-4628-9ac1-f233a456a869
 # ╟─3be237b0-9f19-4e9a-aa13-c6355771b8e8
 # ╟─7453767a-e8f5-4446-b198-fbe48c992aa5
-# ╠═96cf6e3b-1c2b-49f6-979d-0fce28a55a06
-# ╠═08f3bb2c-c80e-43ff-814b-e17ae5a912dc
+# ╟─08f3bb2c-c80e-43ff-814b-e17ae5a912dc
 # ╠═a7fcfdec-db16-4a40-b2f6-5c9c6f856ffc
-# ╠═1d576253-f719-4f21-8cc2-e794399a6ad5
+# ╟─1d576253-f719-4f21-8cc2-e794399a6ad5
