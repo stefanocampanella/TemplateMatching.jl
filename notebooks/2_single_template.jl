@@ -54,6 +54,12 @@ using Plots
 # ╔═╡ 342cbcff-5a05-4199-b5b5-6cc0fa70c202
 using TemplateMatching
 
+# ╔═╡ 7ddcab3c-a100-44be-baa3-af28cc08b2d7
+using Interpolations
+
+# ╔═╡ 341b9066-dcb3-4d99-b985-82e24c11f28e
+using Optim
+
 # ╔═╡ c2f22858-6d3c-4f92-a05b-659deae566f6
 md"## Reading Continuous Data"
 
@@ -205,7 +211,7 @@ md" ## Finding peaks"
 
 # ╔═╡ 7d1f1903-8342-4715-8e88-3e3d063ea5db
 md"""
-correlation threshold $(@bind threshold Slider(0.0:0.05:1, default=0.5, show_value=true))
+correlation threshold $(@bind threshold Slider(0.0:0.05:1, default=0.4, show_value=true))
 
 distance (in unit of template length) $(@bind reldistance Slider(0:0.5:5, default=2, show_value=true))
 """
@@ -215,43 +221,83 @@ peaks, heights = findpeaks(signal, threshold, reldistance * (t_pre + t_post - 1)
 
 # ╔═╡ 96deaa3d-fc40-466f-bf1b-d8d3dd58dcd4
 md"""
-Peak number $(@bind window_pos Slider(axes(peaks, 1), default=1, show_value=true)) / $(length(peaks))
+Peak number $(@bind peak_num Slider(axes(peaks, 1), default=1, show_value=true)) / $(length(peaks))
 """
 
 # ╔═╡ cc0c3e0a-4208-4339-bea1-75396b2778bd
 let 
 	plt = plot(ylims=(0.0, 1.0))
 	scale = round(Int, reldistance * (t_post + t_pre - 1))
-	a = max(first(axes(signal, 1)), peaks[window_pos] - scale)
-	b = min(last(axes(signal, 1)), peaks[window_pos] + scale)
+	a = max(first(axes(signal, 1)), peaks[peak_num] - scale)
+	b = min(last(axes(signal, 1)), peaks[peak_num] + scale)
 	plot!(plt, a:b, signal[a:b], label=nothing)
 	plot!(plt, peaks[a .< peaks .< b], heights[a.< peaks .< b], 
 		seriestype=:scatter, label=nothing, dpi=300)
 	plt
 end
 
+# ╔═╡ b6848d59-e97e-4662-a2ee-78612694d6d8
+md"## Relocalization"
+
+# ╔═╡ a899193d-8685-48b3-a3ff-d91973bd6834
+function find_toa(trace, waveform, center, left, tol)
+	right = size(waveform, 1) - left - 1
+	a, b = center - left - tol, center + right + tol
+	cc = OffsetVector(crosscorrelate(view(trace, a:b), waveform), -tol - 1)
+	cc_max, n_max = findmax(cc)
+	if firstindex(cc) < n_max < lastindex(cc) && cc_max < 1.0 && cc_max ≉ 1.0
+		y1, y2, y3 = cc[n_max - 1:n_max + 1]
+		delta = (y1 - y3) / 2(y1 - 2y2 + y3)
+		center + n_max + delta, min(1.0, y2 + (y3 - y1) / 4delta)
+	else
+		center + Float64(n_max), cc_max
+	end
+end
+
+# ╔═╡ bd5e4f6f-c7e3-440c-9f02-fb3613625508
+toas_corrs = find_toa.(collect(values(data)), template_data, (peaks[peak_num] + t_pre) .+ offsets, t_pre, tolerance)
+
+# ╔═╡ dd0e7c9c-15d7-4e50-aff2-dca482d25220
+function subsampleshift(waveform::AbstractVector{<:AbstractFloat}, quantity; algorithm=BSpline(Cubic(Interpolations.Flat(OnGrid()))))
+	if abs(quantity) > 1.0
+		throw(ArgumentError("Shift should be less than 1.0, got $quantity"))
+	else
+		xs = axes(waveform, 1)
+		itp = interpolate(waveform, algorithm)
+		ext = extrapolate(itp, Interpolations.Flat())
+		@. ext(xs + quantity)
+	end
+end
+
 # ╔═╡ 6d6d27c9-3b1a-4646-8420-61a775f7842f
 let 
-	peak = peaks[window_pos]
+	peak = peaks[peak_num]
 	peak_start = peak - div(t_pre, 2)
 	peak_stop = peak + (t_pre + t_post - 1) + div(t_post, 2)
 	data_start = minimum(series -> first(axes(series, 1)), values(data))
 	data_stop = maximum(series -> last(axes(series, 1)), values(data))
 	xlim = max(data_start, peak_start), min(data_stop, peak_stop)
+	
 	plots = []
 	for (n, channel_num) = enumerate(keys(data))
 		series_start = 	max(first(axes(data[channel_num], 1)), peak_start)
 		series_stop = min(last(axes(data[channel_num], 1)), peak_stop)
 		data_series = OffsetVector(view(data[channel_num], series_start:series_stop), series_start:series_stop)
-		template_aligned = OffsetVector(template_data[n], peak .+ offsets[n])
+		
+		toa_f, toa_i = modf(toas_corrs[n][1] - t_pre)
+		template_interpolated = subsampleshift(template_data[n], toa_f)
+		template_aligned = OffsetVector(template_interpolated, Int(toa_i))
+		
 		data_inf, data_sup = extrema(data_series)
-		template_inf, template_sup = extrema(template_data[n])
-		β = (template_sup - template_inf) / (data_sup - data_inf)
+		data_center = mean(data_series)
+		template_inf, template_sup = extrema(template_interpolated)
+		template_center = mean(template_aligned)
+		β = (data_sup - data_inf) / (template_sup - template_inf)
 		push!(plots,
 			  plot([axes(data_series, 1), axes(template_aligned, 1)], 
-				   [template_inf .+ β .* (data_series .- data_inf), template_aligned];
+				   [data_series, data_center .+ β .* (template_aligned .- template_center)];
 				   xlim,
-				   ylim=(template_inf, template_sup),
+				   ylim=(data_inf, data_sup),
 				   title="Channel $channel_num",
 				   titlealign=:left,
 				   showaxis=false,
@@ -262,20 +308,45 @@ let
 	plot(plots..., layout=(numchannels, 1), size=(800, 100numchannels), dpi=300)
 end
 
+# ╔═╡ 2911437d-4775-4a1b-819e-adf6e91acd61
+measurements = let
+	measurements = copy(sensors_positions)
+	measurements.toas = [sample / samplefreq for (sample, _) in toas_corrs]
+	measurements.cc = [cc for (_, cc) in toas_corrs]
+	filter(row -> row.cc > 0.5, measurements)
+end
+
+# ╔═╡ abbf04cf-ccaf-45a1-8f3e-95aa770d6f4b
+function residue(s)
+	x, t = s[1:3], s[4]
+	Δx_squared = (transpose(Vector(x)) .- measurements[!, [:north, :east, :up]]) .^ 2
+	d_squared =  (v_p .* (t .- measurements.toas)) .^ 2
+	sum((sum(eachcol(Δx_squared)) .- d_squared) .^ 2)
+end
+
+# ╔═╡ 2e6b7b35-9512-406d-9a97-f1f94bea8732
+if nrow(measurements) > 4
+	x0 = Vector(templates[template_num, [:north, :east, :up]])
+	t0 = (peaks[peak_num] + t_pre) / samplefreq
+	candidate = optimize(residue, [x0; t0])
+end
+
+# ╔═╡ 32ab23a5-60b6-4f07-8c0f-cfa2e0a9d7e1
+candidate.minimizer
+
+# ╔═╡ 102e4534-6be4-4436-be36-69726a393253
+md" ## Statistics of the detections "
+
 # ╔═╡ 33bc3279-c65f-47b5-acf4-60853c2bdb91
 begin
 	catalogue = DataFrame()
 	samples = peaks .+ t_pre
 	catalogue.datetimes = @. starttime + Microsecond(samples)
-	catalogue.sample = samples	
-	catalogue.template .= template_num
+	catalogue.sample = samples
 	catalogue.correlation = heights
 	catalogue.rel_mag = [magnitude(values(data), template_data, peak .+ offsets) for peak in peaks]
 	catalogue
 end
-
-# ╔═╡ 102e4534-6be4-4436-be36-69726a393253
-md" ## Statistics of the detections "
 
 # ╔═╡ 471f21ba-23d3-42f4-8d62-12fe2f36124f
 histogram(collect(signal), label=nothing)
@@ -296,8 +367,8 @@ histogram(catalogue[!, :rel_mag], label=nothing)
 # ╠═aa854f02-46bf-4a2b-b1e9-5fb52b99925c
 # ╟─c2f22858-6d3c-4f92-a05b-659deae566f6
 # ╠═8b4426b8-588b-49ad-83c5-a79ed698d704
-# ╟─a86b6c8a-9b90-4388-8208-d257ec6951d2
 # ╠═d47c1cf4-4844-4c66-8a21-b62ad7740dcf
+# ╟─a86b6c8a-9b90-4388-8208-d257ec6951d2
 # ╠═f3f17c65-dab6-46da-83a9-87aad1181524
 # ╠═8271f7e6-d8ac-472a-9538-75d0afacf42e
 # ╟─57b35604-727b-4eac-bcbd-ea302e4c79a2
@@ -337,9 +408,19 @@ histogram(catalogue[!, :rel_mag], label=nothing)
 # ╠═666c8d5f-c1c5-4cb4-9364-bf997b18a683
 # ╟─96deaa3d-fc40-466f-bf1b-d8d3dd58dcd4
 # ╟─cc0c3e0a-4208-4339-bea1-75396b2778bd
+# ╟─b6848d59-e97e-4662-a2ee-78612694d6d8
+# ╠═7ddcab3c-a100-44be-baa3-af28cc08b2d7
+# ╠═341b9066-dcb3-4d99-b985-82e24c11f28e
+# ╠═a899193d-8685-48b3-a3ff-d91973bd6834
+# ╠═bd5e4f6f-c7e3-440c-9f02-fb3613625508
+# ╠═dd0e7c9c-15d7-4e50-aff2-dca482d25220
 # ╟─6d6d27c9-3b1a-4646-8420-61a775f7842f
-# ╠═33bc3279-c65f-47b5-acf4-60853c2bdb91
+# ╠═2911437d-4775-4a1b-819e-adf6e91acd61
+# ╠═abbf04cf-ccaf-45a1-8f3e-95aa770d6f4b
+# ╠═2e6b7b35-9512-406d-9a97-f1f94bea8732
+# ╠═32ab23a5-60b6-4f07-8c0f-cfa2e0a9d7e1
 # ╟─102e4534-6be4-4436-be36-69726a393253
+# ╠═33bc3279-c65f-47b5-acf4-60853c2bdb91
 # ╠═471f21ba-23d3-42f4-8d62-12fe2f36124f
 # ╠═6e2e9172-4cf5-45f3-a239-12c09b6ca3da
 # ╠═feebcd5f-91c4-4a70-a064-e642e3172614
