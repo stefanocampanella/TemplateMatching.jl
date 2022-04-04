@@ -236,3 +236,14 @@ function estimatetoa(trace, waveform, center, tol)
 		Float64(n_max), cc_max
 	end
 end
+
+function line_element(xt, v)
+    x = view(xt, 1:3)
+    t = xt[4]
+    dot(x, x) - v^2 * t^2
+end
+
+residue_rms(xt, sensors_readings, v) = sqrt(mean(ys -> line_element(ys - xt, v)^2, sensors_readings))
+
+locate(toas, sensors_positions, v, x0) = optimize(xt -> residue_rms(xt, eachrow([sensors_positions;; toas]), v), x0)
+
