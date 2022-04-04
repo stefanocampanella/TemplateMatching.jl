@@ -127,7 +127,37 @@ function magnitude(data, template, indices, outlier=mad_test, avg=mean)
     avg(magnitudes[.!outlier(magnitudes)])
 end
 
+"""
+    subsampleshift(waveform, quantity, [algorithm=BSpline(Cubic(Interpolations.Flat(OnGrid())))])
 
+Return `waveform` shifted by `quantity` using `algorithm` for interpolation.
+
+# Examples
+
+```jldoctest
+julia> let f(x) = x^3 + 2x^2 + 3x + 4, x = range(0., 1., 256)
+    f.(x) - TemplateMatching.subsampleshift(TemplateMatching.subsampleshift(f.(x), 0.5), -0.5)
+    end
+256-element Vector{Float64}:
+-0.004025418664664215
+0.002739375467764482
+-0.0009715762853526044
+0.0003239878524432527
+-0.00010386852800969848
+3.2401695163386535e-5
+-9.906591317943025e-6
+2.982589239586275e-6
+⋮
+-7.943511873165221e-6
+2.556364567674052e-5
+-8.017080127764586e-5
+0.0002423473550230426
+-0.0006922700706866181
+0.0017917109396972108
+-0.0037314342840879533
+0.0024503338890315973
+```
+"""
 function subsampleshift(waveform::AbstractVector{<:AbstractFloat}, quantity; algorithm=BSpline(Cubic(Interpolations.Flat(OnGrid()))))
 	if abs(quantity) > 1.0
 		throw(ArgumentError("Shift should be less than 1.0, got $quantity"))
@@ -185,6 +215,14 @@ decreases with decreasing sampling frequencies.
 The position of the maximum cross-correlation is the Time Of Arrival (TOA) 
 in sample units, i.e. the true TOA divided by sampling frequency.
 
+# Examples
+
+```jldoctest
+julia> let v = sin.(range(0, pi, 256)), x = [zeros(128); v; zeros(128)], y = TemplateMatching.subsampleshift(v, 0.5)
+       estimatetoa(x, y, 128, 5)
+       end
+(129.50000000000014, 1.0)
+```
 """
 function estimatetoa(trace, waveform, center, tol)
 	a, b = center - tol, center + tol + length(waveform) - 1 
