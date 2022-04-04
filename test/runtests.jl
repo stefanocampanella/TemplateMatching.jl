@@ -107,4 +107,14 @@ using OffsetArrays
             @test findmax_window(x, 6, 5) == findmax(x)
         end
     end
+
+    @testset "Sub-sample shifting" begin
+        let n_pts = 1024, tol = 1e-3
+            x = sin.(range(0, 2pi, n_pts))
+            for δ in [0.1, 0.5, 0.9] 
+                x_reconstructed = TemplateMatching.subsampleshift(TemplateMatching.subsampleshift(x, δ), -δ)
+                @test std(x .- x_reconstructed) < tol
+            end
+        end
+    end
 end

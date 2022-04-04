@@ -168,7 +168,7 @@ template_data = [view(series, cut) for (series, cut) in zip(values(data), cuts)]
 # ╔═╡ 4ef908f4-d8dc-4159-97ad-fc8d4621a652
 let
 	template_aligned = OffsetVector.(template_data, shifts)
-	xlim = minimum(first(axes(series, 1)) for series in template_aligned), maximum(last(axes(series, 1)) for series in template_aligned)
+	xlim = minimum(firstindex(series, 1) for series in template_aligned), maximum(lastindex(series, 1) for series in template_aligned)
 	plots = []
 	for (nch, series) = zip(keys(data), template_aligned)
 		ylim = minimum(series), maximum(series)
@@ -201,8 +201,8 @@ signal = correlatetemplate(collect(values(data)), template_data, offsets, tolera
 let
 	template_ref = templates[template_num, :sample] - t_pre
 	window = t_pre + t_post - 1
-	a = max(first(axes(signal, 1)), template_ref - div(window, 2))
-	b = min(last(axes(signal, 1)), template_ref + div(window, 2))
+	a = max(firstindex(signal, 1), template_ref - div(window, 2))
+	b = min(lastindex(signal, 1), template_ref + div(window, 2))
 	plot(a:b, signal[a:b], label=nothing, dpi=300)
 end
 
@@ -228,8 +228,8 @@ Peak number $(@bind peak_num Slider(axes(peaks, 1), default=1, show_value=true))
 let 
 	plt = plot(ylims=(0.0, 1.0))
 	scale = round(Int, reldistance * (t_post + t_pre - 1))
-	a = max(first(axes(signal, 1)), peaks[peak_num] - scale)
-	b = min(last(axes(signal, 1)), peaks[peak_num] + scale)
+	a = max(firstindex(signal, 1), peaks[peak_num] - scale)
+	b = min(lastindex(signal, 1), peaks[peak_num] + scale)
 	plot!(plt, a:b, signal[a:b], label=nothing)
 	plot!(plt, peaks[a .< peaks .< b], heights[a.< peaks .< b], 
 		seriestype=:scatter, label=nothing, dpi=300)
@@ -274,14 +274,14 @@ let
 	peak = peaks[peak_num]
 	peak_start = peak - div(t_pre, 2)
 	peak_stop = peak + (t_pre + t_post - 1) + div(t_post, 2)
-	data_start = minimum(series -> first(axes(series, 1)), values(data))
-	data_stop = maximum(series -> last(axes(series, 1)), values(data))
+	data_start = minimum(series -> firstindex(series, 1), values(data))
+	data_stop = maximum(series -> lastindex(series, 1), values(data))
 	xlim = max(data_start, peak_start), min(data_stop, peak_stop)
 	
 	plots = []
 	for (n, channel_num) = enumerate(keys(data))
-		series_start = 	max(first(axes(data[channel_num], 1)), peak_start)
-		series_stop = min(last(axes(data[channel_num], 1)), peak_stop)
+		series_start = 	max(firstindex(data[channel_num], 1), peak_start)
+		series_stop = min(lastindex(data[channel_num], 1), peak_stop)
 		data_series = OffsetVector(view(data[channel_num], series_start:series_stop), series_start:series_stop)
 		
 		toa_f, toa_i = modf(toas_corrs[n][1] - t_pre)

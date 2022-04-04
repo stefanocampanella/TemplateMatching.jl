@@ -43,7 +43,7 @@ function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}
         throw(ArgumentError("Series must be a non-empty vector."))
     elseif isempty(template)
         throw(ArgumentError("Template must be a non-empty vector."))
-    elseif size(series, 1) < size(template, 1)
+    elseif size(series) < size(template)
         throw(DimensionMismatch("Template is longer than series."))
     end
 
@@ -54,8 +54,8 @@ function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}
         y = template
     end
 
-    N = size(template, 1)
-    cc = Vector{element_type}(undef, size(series, 1) - N + 1)
+    N = length(template)
+    cc = Vector{element_type}(undef, length(series) - N + 1)
     x = similar(y) 
     for n in eachindex(cc)
         series_view = view(series, n:n + N - 1)
@@ -89,11 +89,11 @@ julia> maxfilter(sin.(0:0.25pi:2pi), 1)
  -2.4492935982947064e-16
 ```
 """
-function maxfilter(x, l)
+function maxfilter(x::AbstractVector, l)
     y = similar(x)
     for n in eachindex(x)
-        lower = max(n - l, first(axes(x, 1)))
-        upper = min(n + l, last(axes(x, 1)))
+        lower = max(n - l, firstindex(x))
+        upper = min(n + l, lastindex(x))
         y[n] = maximum(view(x, lower:upper))
     end
     y
@@ -118,12 +118,12 @@ julia> stack([[0, 1.0, 0, 0], [0, 0, 1.0, 0]], [1, 2])
 function stack(correlations::AbstractVector{T1}, offsets::AbstractVector{T2}) where {T1 <: AbstractVector, T2 <: Integer}
     if isempty(correlations)
         throw(ArgumentError("Cross-correlations vector must be non-empty."))
-    elseif size(correlations, 1) != size(offsets, 1)
+    elseif length(correlations) != length(offsets)
         throw(DimensionMismatch("Cross-correlations and offsets vectors must have the same length."))
     end
     stackedcorrelations = OffsetVector.(correlations, -offsets)
-    start = maximum(series -> first(axes(series, 1)), stackedcorrelations)
-    stop = minimum(series -> last(axes(series, 1)), stackedcorrelations)
+    start = maximum(series -> firstindex(series), stackedcorrelations)
+    stop = minimum(series -> lastindex(series), stackedcorrelations)
     OffsetVector(mean(series -> view(series, start:stop), stackedcorrelations), start:stop)
 end
 
@@ -138,7 +138,7 @@ compatible with that misplacement.
 function correlatetemplate(data, template, offsets, tolerance, element_type=Float64)
     if isempty(data)
         throw(ArgumentError("Data must be non-empty."))
-    elseif !(size(data, 1) == size(template, 1) == size(offsets, 1))
+    elseif !(length(data) == length(template) == length(offsets))
         throw(DimensionMismatch("Data, template and shifts must have the same length."))
     end
     correlations = similar(data, Vector{element_type})

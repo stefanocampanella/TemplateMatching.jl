@@ -126,8 +126,8 @@ let
 	plots = []
 	numchannels = length(data)
 	for (nch, series) in data
-		a = max(first(axes(series, 1)), center - div(npts, 2))
-		b = min(last(axes(series, 1)), center + div(npts, 2))
+		a = max(firstindex(series, 1), center - div(npts, 2))
+		b = min(lastindex(series, 1), center + div(npts, 2))
 		ylim = extrema(view(series, a:b))
 		push!(plots, plot(a:b, view(series, a:b),
 			  ylim=ylim,
