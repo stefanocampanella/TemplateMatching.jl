@@ -6,9 +6,12 @@ using OffsetArrays
 using Interpolations
 using Optim
 
-export crosscorrelate, maxfilter, stack, correlatetemplate, findpeaks, magnitude, findmax_window, estimatetoa, residue, locate
+export crosscorrelate, maxfilter, stack, correlatetemplate, findpeaks, 
+       magnitude, findmax_window, subsampleshift, estimatetoa, residue_rms, 
+       locate
 
 include("crosscorrelation.jl")
 include("processing.jl")
+include("utils.jl")
 
 end

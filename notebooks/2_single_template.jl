@@ -239,8 +239,8 @@ end
 # ╔═╡ b6848d59-e97e-4662-a2ee-78612694d6d8
 md"## Relocalization"
 
-# ╔═╡ bd5e4f6f-c7e3-440c-9f02-fb3613625508
-toas_corrs = estimatetoa.(collect(values(data)), template_data, peaks[peak_num] .+ offsets, tolerance)
+# ╔═╡ 89b036db-5c47-4a17-8466-9062e8d5d452
+toas = estimatetoa.(collect(values(data)), template_data, peaks[peak_num] .+ offsets, tolerance)
 
 # ╔═╡ 6d6d27c9-3b1a-4646-8420-61a775f7842f
 let 
@@ -257,8 +257,8 @@ let
 		series_stop = min(lastindex(data[channel_num], 1), peak_stop)
 		data_series = OffsetVector(view(data[channel_num], series_start:series_stop), series_start:series_stop)
 		
-		toa_f, toa_i = modf(toas_corrs[n][1])
-		template_interpolated = TemplateMatching.subsampleshift(template_data[n], toa_f)
+		toa_f, toa_i = modf(toas[n][1])
+		template_interpolated = subsampleshift(template_data[n], toa_f)
 		template_aligned = OffsetVector(template_interpolated, Int(toa_i))
 		
 		data_inf, data_sup = extrema(data_series)
@@ -282,32 +282,56 @@ let
 end
 
 # ╔═╡ 2911437d-4775-4a1b-819e-adf6e91acd61
-measurements = let
+measurements = let correlation_threshold = 0.5
 	measurements = copy(sensors_positions)
-	measurements.toas = [(sample + t_pre) / samplefreq for (sample, _) in toas_corrs]
-	measurements.cc = [cc for (_, cc) in toas_corrs]
-	filter(row -> row.cc > 0.5, measurements)
+	measurements.toas = [(sample + t_pre) / samplefreq for (sample, _) in toas]
+	measurements.cc = [cc for (_, cc) in toas]
+	filter(row -> row.cc > correlation_threshold, measurements)
 end
 
 # ╔═╡ 2e6b7b35-9512-406d-9a97-f1f94bea8732
 if nrow(measurements) > 4
 	x0 = Vector(templates[template_num, [:north, :east, :up]])
 	t0 = (peaks[peak_num] + t_pre) / samplefreq
-	candidate = locate(measurements.toas, Matrix(measurements[!, [:north, :east, :up]]), v_p, [x0; t0])
+	sensors_readings = eachrow(Matrix(measurements[!, [:north, :east, :up, :toas]]))
+	candidate = locate(sensors_readings, v_p, [x0; t0])
 end
 
 # ╔═╡ 32ab23a5-60b6-4f07-8c0f-cfa2e0a9d7e1
 candidate.minimizer
 
 # ╔═╡ 91f9aee4-6f80-4b02-ab09-1ace3759ea22
-let npx = 100, npy = 100
+let dx = 1, dy = 1, npx = 100, npy = 100
 	y0, x0, z0, t0 = candidate.minimizer
-	yrange = range(y0 - 1, y0 + 1, 100)
-	xrange = range(x0 - 1, x0 + 1, 100)
-	grid = reshape([TemplateMatching.residue_rms([y, x, z0, t0], eachrow(Matrix(measurements[!, [:north, :east, :up, :toas]])), v_p) for x = xrange, y = yrange], npx, npy)
-	contour(xrange, yrange, grid, fill=:true, c=:thermal)
+	xrange = range(x0 - dx, x0 + dx, npx)
+	yrange = range(y0 - dy, y0 + dy, npy)
+	sensors_readings = eachrow(Matrix(measurements[!, [:north, :east, :up, :toas]]))
+	residues = reshape(
+		[residue_rms([y, x, z0, t0], sensors_readings, v_p) 
+			for x = xrange, y = yrange], 
+		npx, npy)
+	contour(xrange, yrange, residues, fill=:true, c=:heat)
 	y1, x1 = templates[template_num, [:north, :east]]
-	scatter!([x0, x1], [y0, y1], markershape=[:x, :circle])
+	scatter!([x1], [y1], markershape=:circle, label="Template")
+	scatter!([x0], [y0], markershape=:x, label="Event")
+	plot!(title="X-Y Section")
+end
+
+# ╔═╡ 5c40564b-bb44-47f4-a98e-e09f161e2d68
+let dx = 1, dz = 1, npx = 100, npz = 100
+	y0, x0, z0, t0 = candidate.minimizer
+	xrange = range(x0 - dx, x0 + dx, npx)
+	zrange = range(z0 - dz, z0 + dz, npz)
+	sensors_readings = eachrow(Matrix(measurements[!, [:north, :east, :up, :toas]]))
+	residues = reshape(
+		[TemplateMatching.residue_rms([y0, x, z, t0], sensors_readings, v_p) 
+			for x = xrange, z = zrange], 
+		npx, npz)
+	contour(xrange, zrange, residues, fill=:true, c=:heat)
+	z1, x1 = templates[template_num, [:up, :east]]
+	scatter!([x1], [z1], markershape=:circle, label="Template")
+	scatter!([x0], [z0], markershape=:x, label="Event")
+	plot!(title="X-Z Section")
 end
 
 # ╔═╡ 102e4534-6be4-4436-be36-69726a393253
@@ -387,12 +411,13 @@ histogram(catalogue[!, :rel_mag], label=nothing)
 # ╟─b6848d59-e97e-4662-a2ee-78612694d6d8
 # ╠═7ddcab3c-a100-44be-baa3-af28cc08b2d7
 # ╠═341b9066-dcb3-4d99-b985-82e24c11f28e
-# ╠═bd5e4f6f-c7e3-440c-9f02-fb3613625508
-# ╟─6d6d27c9-3b1a-4646-8420-61a775f7842f
+# ╠═89b036db-5c47-4a17-8466-9062e8d5d452
+# ╠═6d6d27c9-3b1a-4646-8420-61a775f7842f
 # ╠═2911437d-4775-4a1b-819e-adf6e91acd61
 # ╠═2e6b7b35-9512-406d-9a97-f1f94bea8732
 # ╠═32ab23a5-60b6-4f07-8c0f-cfa2e0a9d7e1
 # ╠═91f9aee4-6f80-4b02-ab09-1ace3759ea22
+# ╠═5c40564b-bb44-47f4-a98e-e09f161e2d68
 # ╟─102e4534-6be4-4436-be36-69726a393253
 # ╠═33bc3279-c65f-47b5-acf4-60853c2bdb91
 # ╠═471f21ba-23d3-42f4-8d62-12fe2f36124f
