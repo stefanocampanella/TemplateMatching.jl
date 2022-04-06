@@ -133,7 +133,7 @@ md"""Template post:$(@bind t_post Slider(0:1000, default=500, show_value=true))
 
 # ╔═╡ 7d1f1903-8342-4715-8e88-3e3d063ea5db
 md"""
-signal height threshold $(@bind height_threshold Slider(0.0:0.05:1, default=0.5, show_value=true))
+signal height threshold $(@bind height_threshold Slider(0.0:0.05:1, default=0.4, show_value=true))
 """
 
 # ╔═╡ 8790874d-322e-4aea-a60b-4717e653afc9
