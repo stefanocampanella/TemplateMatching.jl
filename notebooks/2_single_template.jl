@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.18.1
+# v0.19.0
 
 using Markdown
 using InteractiveUtils
@@ -412,12 +412,12 @@ histogram(catalogue[!, :rel_mag], label=nothing)
 # ╠═7ddcab3c-a100-44be-baa3-af28cc08b2d7
 # ╠═341b9066-dcb3-4d99-b985-82e24c11f28e
 # ╠═89b036db-5c47-4a17-8466-9062e8d5d452
-# ╠═6d6d27c9-3b1a-4646-8420-61a775f7842f
+# ╟─6d6d27c9-3b1a-4646-8420-61a775f7842f
 # ╠═2911437d-4775-4a1b-819e-adf6e91acd61
 # ╠═2e6b7b35-9512-406d-9a97-f1f94bea8732
 # ╠═32ab23a5-60b6-4f07-8c0f-cfa2e0a9d7e1
-# ╠═91f9aee4-6f80-4b02-ab09-1ace3759ea22
-# ╠═5c40564b-bb44-47f4-a98e-e09f161e2d68
+# ╟─91f9aee4-6f80-4b02-ab09-1ace3759ea22
+# ╟─5c40564b-bb44-47f4-a98e-e09f161e2d68
 # ╟─102e4534-6be4-4436-be36-69726a393253
 # ╠═33bc3279-c65f-47b5-acf4-60853c2bdb91
 # ╠═471f21ba-23d3-42f4-8d62-12fe2f36124f
