@@ -85,6 +85,7 @@ using OffsetArrays
     end
 
     @testset "Magnitude" begin
+        @test isnan(magnitude(Vector{Float64}[], Vector{Float64}[], Int[]))
         @test isnan(magnitude([rand(100) for _ = 1:10], [fill(0.0, 10) for _ = 1:10], [45 for _ = 1:10]))
         @test isnan(magnitude([fill(0.0, 100) for _ = 1:10], [rand(10) for _ = 1:10], [45 for _ = 1:10]))
         let num_series = 3

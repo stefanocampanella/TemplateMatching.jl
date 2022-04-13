@@ -97,14 +97,18 @@ julia> TemplateMatching.mad_test([1, 2, 3, 100])
  1
 ```
 """
-function mad_test(xs, r=3.0)
-    deviations = abs.(xs .- median(xs))
-    deviations .> r * median(deviations)
+function mad_test(xs::AbstractVector{<:Number}, r=3.0)
+    if isempty(xs)
+        BitVector()
+    else
+        deviations = abs.(xs .- median(xs))
+        deviations .> r * median(deviations)
+    end
 end
 
-function series_magnitude(series, template, index)
-    series_amp = maximum(abs.(view(series, index:index + length(template) - 1)))
-    template_amp = maximum(abs.(template))
+function series_magnitude(series, waveform, index)
+    series_amp = maximum(abs.(view(series, index:index + length(waveform) - 1)))
+    template_amp = maximum(abs.(waveform))
     if iszero(template_amp)
         NaN
     elseif iszero(series_amp)
