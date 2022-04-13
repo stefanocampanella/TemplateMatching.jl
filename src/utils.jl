@@ -80,7 +80,7 @@ julia> let v = sin.(range(0, pi, 256)), x = [zeros(128); v; zeros(128)], y = Tem
 ```
 """
 function estimatetoa(trace, waveform, center, tol)
-	a, b = center - tol, center + tol + length(waveform) - 1 
+	a, b = max(firstindex(trace), center - tol), min(lastindex(trace), center + tol + length(waveform) - 1)
 	cc = OffsetVector(crosscorrelate(view(trace, a:b), waveform), center - tol - 1)
 	cc_max, n_max = findmax_window(cc, center, tol)
 	if firstindex(cc) < n_max < lastindex(cc) && cc_max < 1.0 && cc_max ≉ 1.0
