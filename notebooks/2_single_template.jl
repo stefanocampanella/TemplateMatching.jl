@@ -412,7 +412,7 @@ histogram(catalogue[!, :rel_mag], label=nothing)
 # ╠═7ddcab3c-a100-44be-baa3-af28cc08b2d7
 # ╠═341b9066-dcb3-4d99-b985-82e24c11f28e
 # ╠═89b036db-5c47-4a17-8466-9062e8d5d452
-# ╟─6d6d27c9-3b1a-4646-8420-61a775f7842f
+# ╠═6d6d27c9-3b1a-4646-8420-61a775f7842f
 # ╠═2911437d-4775-4a1b-819e-adf6e91acd61
 # ╠═2e6b7b35-9512-406d-9a97-f1f94bea8732
 # ╠═32ab23a5-60b6-4f07-8c0f-cfa2e0a9d7e1

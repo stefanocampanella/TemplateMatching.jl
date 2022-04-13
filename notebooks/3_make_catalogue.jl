@@ -157,18 +157,22 @@ v_p = 0.67345 # in cm/us
 function relocate_match(data_stream, template, match_offsets, guess, correlation_threshold, nch_min)
 	toas = estimatetoa.(data_stream, template, match_offsets, tolerance)
 	readings = copy(sensors_positions)
+	readings.index = 1:nrow(readings)
 	readings.toas = [(sample + t_pre) / samplefreq for (sample, _) in toas]
 	readings.cc = [cc for (_, cc) in toas]
 	filter!(row -> row.cc > correlation_threshold, readings)
+	crosscorrelation = mean(readings.cc)
+	relative_magnitude = magnitude(data_stream[readings.index], template[readings.index], match_offsets[readings.index])
 	nch = nrow(readings)
 	if nch >= nch_min
 		readings_matrix = eachrow(Matrix(readings[!, [:north, :east, :up, :toas]]))
 		candidate = locate(readings_matrix, v_p, guess)
 		north, east, up, origin_time = candidate.minimizer
-		residual = candidate.minimum
-		(; north, east, up, origin_time, residual, nch)
+		multilateration_residual = candidate.minimum
+		(; north, east, up, origin_time, relative_magnitude, crosscorrelation, nch, multilateration_residual)
 	else
-		(north=NaN, east=NaN, up=NaN, origin_time=NaN, residual=missing, nch=nch)
+		north, east, up, origin_time = guess
+		(north, east, up, origin_time, relative_magnitude, crosscorrelation, nch, multilateration_residual=missing)
 	end
 end
 
@@ -193,9 +197,8 @@ templatematch_catalogue = let
 		# Computing magnitudes and relocating events
 		matches = DataFrame()
 		matches.sample = peaks .+ t_pre
-		matches.correlation = heights
+		matches.height = heights
 		matches.template .= n
-		matches.relative_magnitude = [magnitude(data_stream, template_data, peak .+ offsets) for peak in peaks]
 		x0 = Vector(catalogue[n, [:north, :east, :up]])
 		coordinates = [relocate_match(data_stream, 
 			                          template_data, 
@@ -206,7 +209,7 @@ templatematch_catalogue = let
 			           for peak in peaks]
 		matches = hcat(matches, DataFrame(coordinates))
 		matches.datetime = @. starttime + Microsecond(round(Int, matches.origin_time))
-		matches_vec[n] = dropmissing(matches)
+		matches_vec[n] = matches
 	end
 	reduce(vcat, matches_vec)
 end
@@ -218,13 +221,13 @@ CSV.write("../data/2021-01-12_20-25-30/templatematch.csv", templatematch_catalog
 md" ## Statistics of the detections "
 
 # ╔═╡ 45ef95ec-c638-4a94-b631-213cf3170fab
-nontemplates = @. !(templatematch_catalogue.correlation > 0.999 && templatematch_catalogue.relative_magnitude ≈ 0.0)
+nontemplates = @. !(templatematch_catalogue.crosscorrelation > 0.999 && templatematch_catalogue.relative_magnitude ≈ 0.0)
 
 # ╔═╡ feebcd5f-91c4-4a70-a064-e642e3172614
-histogram(templatematch_catalogue[nontemplates, :correlation], label=nothing)
+histogram(templatematch_catalogue[nontemplates, :crosscorrelation], label=nothing)
 
 # ╔═╡ 476101af-0108-4628-9ac1-f233a456a869
-summarystats(templatematch_catalogue[nontemplates, :correlation])
+summarystats(templatematch_catalogue[nontemplates, :crosscorrelation])
 
 # ╔═╡ 3be237b0-9f19-4e9a-aa13-c6355771b8e8
 histogram(templatematch_catalogue[nontemplates, :relative_magnitude], label=nothing)
@@ -236,7 +239,7 @@ summarystats(templatematch_catalogue[nontemplates, :relative_magnitude])
 let
 	scatter(templatematch_catalogue.origin_time,
 		    catalogue[templatematch_catalogue.template,:sample],
-			zcolor=templatematch_catalogue.correlation,
+			zcolor=templatematch_catalogue.crosscorrelation,
 			c=:heat,
 			markersize=4exp.(templatematch_catalogue.relative_magnitude),
 			ylabel="Template origin [μs]",

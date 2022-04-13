@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.18.1
+# v0.19.0
 
 using Markdown
 using InteractiveUtils
@@ -33,9 +33,6 @@ using CSV
 # ╔═╡ 76e2e659-c708-4a08-8263-def6c3dfa930
 using Dates
 
-# ╔═╡ 95347531-11f3-4a66-ba6c-7ffdc70b7806
-using JLD2
-
 # ╔═╡ 533d8e9e-40ff-4740-bbd9-8199cf0bcef6
 using TemplateMatching
 
@@ -47,6 +44,12 @@ using StatsBase
 
 # ╔═╡ a7fcfdec-db16-4a40-b2f6-5c9c6f856ffc
 using Printf
+
+# ╔═╡ 33ff9417-b0b4-4f60-8c81-22c1181b37aa
+using MultivariateStats
+
+# ╔═╡ 3ec5251a-2e3e-4344-bb1f-fcd79daf9714
+using LinearAlgebra
 
 # ╔═╡ 9406c22e-fb52-461c-9b48-22bceb1b056c
 md"## Reading templates catalogue"
@@ -93,26 +96,6 @@ templates = let
 	templates
 end
 
-# ╔═╡ 6ac6cce3-09ae-421a-b502-b5c8807bf555
-md"## Reading Sensors Positions"
-
-# ╔═╡ 7d1f6c79-afbc-4300-bb6b-3aeed6844582
-md"""Path of the JLD2 file containing continuous data: $(@bind datapath TextField(default="../data/2021-01-12_20-25-30/data.jld2"))"""
-
-# ╔═╡ 05e33788-5c54-4425-b1ad-dba175ad5cbe
-data = load(datapath, "data")
-
-# ╔═╡ be090485-7917-464a-8e8c-aec4a2c009d3
-sensors_positions = let
-	sensors_positions = CSV.read("../data/2021-01-12_20-25-30/passive-xyz.csv", DataFrame, header=[:north, :east, :up])
-	for s = [:north, :east, :up]
-		sensors_positions[!, s] .*= 100
-	end
-	sensors_positions.sensor = axes(sensors_positions, 1) .- 1
-	filter!(r -> r.sensor in keys(data), sensors_positions)
-	sensors_positions
-end
-
 # ╔═╡ 57b35604-727b-4eac-bcbd-ea302e4c79a2
 md"## Reading template matched catalogue"
 
@@ -121,7 +104,7 @@ md"""Path of the CSV template-match catalogue $(@bind cataloguepath TextField(de
 
 # ╔═╡ c46997fc-9ab5-4678-bdd1-6874f77e7bca
 catalogue = let
-	df = CSV.read(cataloguepath, DataFrame, select=[:sample, :template, :correlation, :relative_magnitude])
+	df = CSV.read(cataloguepath, DataFrame, select=[:sample, :template, :correlation, :relative_magnitude, :north, :east, :up, :origin_time, :residual, :nch])
 	sort!(df, :sample)
 	tokeep = TemplateMatching.selectbypeaksdistance(df.sample, df.correlation, 600)
 	df[tokeep, :]
@@ -146,7 +129,7 @@ histogram(catalogue[nontemplates, :relative_magnitude], label=nothing)
 summarystats(catalogue[nontemplates, :relative_magnitude])
 
 # ╔═╡ 08f3bb2c-c80e-43ff-814b-e17ae5a912dc
-scatter(catalogue[:, :sample] ./ samplefreq,
+scatter(catalogue[:, :origin_time],
 		templates[catalogue.template, :sample] ./ samplefreq,
 		zcolor=catalogue.correlation,
 		c=:heat,
@@ -160,7 +143,7 @@ scatter(catalogue[:, :sample] ./ samplefreq,
 		dpi=500)
 
 # ╔═╡ 1d576253-f719-4f21-8cc2-e794399a6ad5
-let nframes = 500, size_r = 0.8, alpha_r = 1e-6, data_len = maximum(length, values(data))
+let nframes = 500, size_r = 0.8, alpha_r = 1e-6, data_len = Int(4e6)
 	@gif for n = range(1, data_len, nframes)
 		selection = catalogue[catalogue.sample .<= n, :]
 		if !isempty(selection)
@@ -181,6 +164,64 @@ let nframes = 500, size_r = 0.8, alpha_r = 1e-6, data_len = maximum(length, valu
 	end
 end
 
+# ╔═╡ 6dddcebd-d730-470e-a831-154ee3102e0d
+let nframes = 500, size_r = 0.8, alpha_r = 1e-6, data_len = Int(4e6)
+	@gif for n = range(1, data_len, nframes)
+		selection = catalogue[catalogue.origin_time .<= n / samplefreq, :]
+		if !isempty(selection)
+	    	scatter(selection[!, :east],
+					selection[!, :north],
+					selection[!, :up],
+					markersize=2.5,
+					xlim=(0, 25),
+					ylim=(0, 25),
+					zlim=(0, 25),
+					title=@sprintf("%.2f ms", 1e-3n / samplefreq),
+					legend=nothing)
+		end
+	end
+end
+
+# ╔═╡ 0131b25b-8b5c-4d1e-a520-830f5f20f345
+X = transpose(Matrix(catalogue[!, [:north, :east, :up]]))
+
+# ╔═╡ 09731759-c6c6-43ba-bc99-493327efa342
+M = fit(PCA, X, maxoutdim=2)
+
+# ╔═╡ 8c740959-ee9b-4139-a31b-fdd7ccc7f563
+xlim, ylim = extrema(predict(M, X), dims=2)
+
+# ╔═╡ 2837928e-692a-42ee-a064-07a3042d3d7b
+let nframes = 500, data_len = Int(4e6)
+	@gif for n = range(1, data_len, nframes)
+		selection = catalogue[catalogue.origin_time .<= n / samplefreq, :]
+		if !isempty(selection)
+			X = transpose(Matrix(selection[!, [:north, :east, :up]]))
+			Y = predict(M, X)
+	    	scatter(Y[1, :],
+					Y[2, :],
+					xlim=xlim,
+					ylim=ylim,
+					title=@sprintf("%.2f ms", 1e-3n / samplefreq),
+					legend=nothing)			
+		end
+	end
+end
+
+# ╔═╡ 3212d37b-e498-4711-a067-14dca93a91a8
+let
+	Y = predict(M, X)
+	plot(fit(Histogram, (Y[1, :], Y[2, :]), nbins=64))
+end
+
+# ╔═╡ 04d6e989-3fd0-4efd-a570-0ae34164cf4f
+let
+	Y = predict(M, X)
+	Z = norm.(eachcol(X .- reconstruct(M, Y)))
+	selection = Z .< percentile(Z, 90)
+	scatter(Y[1, selection], Y[2, selection], zcolor=Z[selection], c=:heat, markersize=2.5, label="")
+end
+
 # ╔═╡ Cell order:
 # ╠═aa854f02-46bf-4a2b-b1e9-5fb52b99925c
 # ╠═8b4426b8-588b-49ad-83c5-a79ed698d704
@@ -194,11 +235,6 @@ end
 # ╠═60ad8eb3-a313-4dce-82bd-a74a4d6842fd
 # ╠═c76f6541-b0e2-4aba-9533-8ab6c23685bb
 # ╠═56c57ae9-5254-4dca-a793-bfdeee9a0ba5
-# ╟─6ac6cce3-09ae-421a-b502-b5c8807bf555
-# ╠═95347531-11f3-4a66-ba6c-7ffdc70b7806
-# ╟─7d1f6c79-afbc-4300-bb6b-3aeed6844582
-# ╠═05e33788-5c54-4425-b1ad-dba175ad5cbe
-# ╠═be090485-7917-464a-8e8c-aec4a2c009d3
 # ╟─57b35604-727b-4eac-bcbd-ea302e4c79a2
 # ╟─b62d7318-3a6d-4442-b6cc-3166b87dff8a
 # ╠═533d8e9e-40ff-4740-bbd9-8199cf0bcef6
@@ -211,6 +247,15 @@ end
 # ╟─476101af-0108-4628-9ac1-f233a456a869
 # ╟─3be237b0-9f19-4e9a-aa13-c6355771b8e8
 # ╟─7453767a-e8f5-4446-b198-fbe48c992aa5
-# ╟─08f3bb2c-c80e-43ff-814b-e17ae5a912dc
+# ╠═08f3bb2c-c80e-43ff-814b-e17ae5a912dc
 # ╠═a7fcfdec-db16-4a40-b2f6-5c9c6f856ffc
 # ╟─1d576253-f719-4f21-8cc2-e794399a6ad5
+# ╟─6dddcebd-d730-470e-a831-154ee3102e0d
+# ╠═33ff9417-b0b4-4f60-8c81-22c1181b37aa
+# ╠═0131b25b-8b5c-4d1e-a520-830f5f20f345
+# ╠═09731759-c6c6-43ba-bc99-493327efa342
+# ╠═8c740959-ee9b-4139-a31b-fdd7ccc7f563
+# ╠═2837928e-692a-42ee-a064-07a3042d3d7b
+# ╠═3ec5251a-2e3e-4344-bb1f-fcd79daf9714
+# ╠═3212d37b-e498-4711-a067-14dca93a91a8
+# ╠═04d6e989-3fd0-4efd-a570-0ae34164cf4f
