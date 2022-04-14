@@ -45,12 +45,6 @@ using TemplateMatching
 # ╔═╡ 4249c937-1b33-4aca-8351-d98a19c584fa
 using Tables
 
-# ╔═╡ f07ab63f-dfb4-493c-a40c-6b3363a858c3
-using Plots
-
-# ╔═╡ 356cc4c2-e565-4847-9286-cfc1f835654d
-using StatsBase
-
 # ╔═╡ c2f22858-6d3c-4f92-a05b-659deae566f6
 md"## Reading Continuous Data"
 
@@ -108,9 +102,12 @@ end
 # ╔═╡ 6ac6cce3-09ae-421a-b502-b5c8807bf555
 md"## Reading Sensors Positions"
 
+# ╔═╡ cfceae8c-0967-4a47-93f5-2b6e3073624c
+md"""Path of the CSV of sensors positions $(@bind sensorspospath TextField(default="../data/2021-01-12_20-25-30/passive-xyz.csv"))"""
+
 # ╔═╡ be090485-7917-464a-8e8c-aec4a2c009d3
 sensors_positions = let
-	sensors_positions = CSV.read("../data/2021-01-12_20-25-30/passive-xyz.csv", DataFrame, header=[:north, :east, :up])
+	sensors_positions = CSV.read(sensorspospath, DataFrame, header=[:north, :east, :up])
 	for s = [:north, :east, :up]
 		sensors_positions[!, s] .*= 100
 	end
@@ -133,7 +130,7 @@ md"""Template post:$(@bind t_post Slider(0:1000, default=500, show_value=true))
 
 # ╔═╡ 7d1f1903-8342-4715-8e88-3e3d063ea5db
 md"""
-signal height threshold $(@bind height_threshold Slider(0.0:0.05:1, default=0.4, show_value=true))
+signal height threshold $(@bind height_threshold Slider(0.0:0.05:1, default=0.3, show_value=true))
 """
 
 # ╔═╡ 8790874d-322e-4aea-a60b-4717e653afc9
@@ -169,17 +166,18 @@ function relocate_match(data_stream, template, match_offsets, guess, correlation
 		candidate = locate(readings_matrix, v_p, guess)
 		north, east, up, origin_time = candidate.minimizer
 		multilateration_residual = candidate.minimum
-		(; north, east, up, origin_time, relative_magnitude, crosscorrelation, nch, multilateration_residual)
 	else
 		north, east, up, origin_time = guess
-		(north, east, up, origin_time, relative_magnitude, crosscorrelation, nch, multilateration_residual=missing)
+		multilateration_residual = missing
 	end
+	(; north, east, up, origin_time, relative_magnitude, crosscorrelation, nch, multilateration_residual)
 end
 
 # ╔═╡ 666c8d5f-c1c5-4cb4-9364-bf997b18a683
-templatematch_catalogue = let
+augmented_catalogue = let
 	data_stream = collect(values(data))
 	matches_vec = Vector{DataFrame}(undef, nrow(catalogue))
+	distance_threshold = reldistance * (t_pre + t_post - 1)
 	Threads.@threads for n = eachindex(matches_vec)
 		# Preparing template
 		displacement = DataFrame()
@@ -193,7 +191,7 @@ templatematch_catalogue = let
 		template_data = [view(series, cut) for (series, cut) in zip(data_stream, cuts)]
 		# Computing cross-correlation and finding peaks
 		signal = correlatetemplate(data_stream, template_data, offsets, tolerance)
-		peaks, heights = findpeaks(signal, height_threshold, reldistance * (t_pre + t_post - 1))
+		peaks, heights = findpeaks(signal, height_threshold, distance_threshold)
 		# Computing magnitudes and relocating events
 		matches = DataFrame()
 		matches.sample = peaks .+ t_pre
@@ -211,45 +209,16 @@ templatematch_catalogue = let
 		matches.datetime = @. starttime + Microsecond(round(Int, matches.origin_time))
 		matches_vec[n] = matches
 	end
-	reduce(vcat, matches_vec)
+	augmented_catalogue = reduce(vcat, matches_vec)
+	tokeep = TemplateMatching.selectbypeaksdistance(augmented_catalogue.origin_time, augmented_catalogue.crosscorrelation, distance_threshold)
+	augmented_catalogue[tokeep, :]
 end
+
+# ╔═╡ b50df30e-f7c3-44f2-b759-3e4ca31003d9
+md"""Path of where ouput augmente catalogue $(@bind outputpath TextField(default="../data/2021-01-12_20-25-30/augmented_catalogue.csv"))"""
 
 # ╔═╡ 3784a5b2-8621-4bac-87a1-4decc25cf4f5
-CSV.write("../data/2021-01-12_20-25-30/templatematch.csv", templatematch_catalogue)
-
-# ╔═╡ 102e4534-6be4-4436-be36-69726a393253
-md" ## Statistics of the detections "
-
-# ╔═╡ 45ef95ec-c638-4a94-b631-213cf3170fab
-nontemplates = @. !(templatematch_catalogue.crosscorrelation > 0.999 && templatematch_catalogue.relative_magnitude ≈ 0.0)
-
-# ╔═╡ feebcd5f-91c4-4a70-a064-e642e3172614
-histogram(templatematch_catalogue[nontemplates, :crosscorrelation], label=nothing)
-
-# ╔═╡ 476101af-0108-4628-9ac1-f233a456a869
-summarystats(templatematch_catalogue[nontemplates, :crosscorrelation])
-
-# ╔═╡ 3be237b0-9f19-4e9a-aa13-c6355771b8e8
-histogram(templatematch_catalogue[nontemplates, :relative_magnitude], label=nothing)
-
-# ╔═╡ 7453767a-e8f5-4446-b198-fbe48c992aa5
-summarystats(templatematch_catalogue[nontemplates, :relative_magnitude])
-
-# ╔═╡ 08f3bb2c-c80e-43ff-814b-e17ae5a912dc
-let
-	scatter(templatematch_catalogue.origin_time,
-		    catalogue[templatematch_catalogue.template,:sample],
-			zcolor=templatematch_catalogue.crosscorrelation,
-			c=:heat,
-			markersize=4exp.(templatematch_catalogue.relative_magnitude),
-			ylabel="Template origin [μs]",
-			xlabel="Detection origin [μs]",
-			colorbar=:right,
-			colorbar_title="\nCross-correlation",
-   			right_margin = 3Plots.mm,
-		    legend=nothing,
-			dpi=500)
-end
+CSV.write(outputpath, augmented_catalogue)
 
 # ╔═╡ Cell order:
 # ╠═aa854f02-46bf-4a2b-b1e9-5fb52b99925c
@@ -269,6 +238,7 @@ end
 # ╠═d5beeb75-7ca6-4f28-a63b-6e3070fb4c73
 # ╠═5d5f3ca7-260d-4dbb-bde1-59f2bd58c0c9
 # ╟─6ac6cce3-09ae-421a-b502-b5c8807bf555
+# ╠═cfceae8c-0967-4a47-93f5-2b6e3073624c
 # ╠═be090485-7917-464a-8e8c-aec4a2c009d3
 # ╟─368f7fc1-0afc-439f-905a-76af04e8ca8d
 # ╠═41b0f95e-d806-4167-8199-7392717782f9
@@ -284,13 +254,5 @@ end
 # ╠═c7f0582a-8997-4641-b607-0b95a7f73a6c
 # ╠═afe1c12f-23d3-47af-bfe8-b59ca7018593
 # ╠═666c8d5f-c1c5-4cb4-9364-bf997b18a683
+# ╠═b50df30e-f7c3-44f2-b759-3e4ca31003d9
 # ╠═3784a5b2-8621-4bac-87a1-4decc25cf4f5
-# ╟─102e4534-6be4-4436-be36-69726a393253
-# ╠═f07ab63f-dfb4-493c-a40c-6b3363a858c3
-# ╠═356cc4c2-e565-4847-9286-cfc1f835654d
-# ╠═45ef95ec-c638-4a94-b631-213cf3170fab
-# ╟─feebcd5f-91c4-4a70-a064-e642e3172614
-# ╟─476101af-0108-4628-9ac1-f233a456a869
-# ╟─3be237b0-9f19-4e9a-aa13-c6355771b8e8
-# ╟─7453767a-e8f5-4446-b198-fbe48c992aa5
-# ╠═08f3bb2c-c80e-43ff-814b-e17ae5a912dc
