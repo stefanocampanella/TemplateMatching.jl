@@ -215,7 +215,7 @@ augmented_catalogue = let
 end
 
 # ╔═╡ b50df30e-f7c3-44f2-b759-3e4ca31003d9
-md"""Path where ouput augmente catalogue $(@bind outputpath TextField(default="../data/2021-01-12_20-25-30/augmented_catalogue.csv"))"""
+md"""Path where to output the augmented catalogue $(@bind outputpath TextField(default="../data/2021-01-12_20-25-30/augmented_catalogue.csv"))"""
 
 # ╔═╡ 3784a5b2-8621-4bac-87a1-4decc25cf4f5
 CSV.write(outputpath, augmented_catalogue)
