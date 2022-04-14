@@ -130,22 +130,22 @@ md"""Template post:$(@bind t_post Slider(0:1000, default=500, show_value=true))
 
 # ╔═╡ 7d1f1903-8342-4715-8e88-3e3d063ea5db
 md"""
-signal height threshold $(@bind height_threshold Slider(0.0:0.05:1, default=0.3, show_value=true))
+Signal height threshold $(@bind height_threshold Slider(0.0:0.05:1, default=0.3, show_value=true))
 """
 
 # ╔═╡ 8790874d-322e-4aea-a60b-4717e653afc9
-md"""distance (in unit of template length) $(@bind reldistance Slider(0:0.5:5, default=2, show_value=true))"""
+md"""Distance (in unit of template length) $(@bind reldistance Slider(0:0.5:5, default=2, show_value=true))"""
 
 # ╔═╡ 0d122aef-1767-4389-b043-97d07ecef1fe
 md"""
-tolerance $(@bind tolerance Slider(0:10, default=5, show_value=true))
+Tolerance $(@bind tolerance Slider(0:10, default=5, show_value=true))
 """
 
 # ╔═╡ ef346f24-ab46-407b-95a0-2bce10b41ac8
-md"""cross-correlation threshold $(@bind cc_threshold Slider(0.0:0.05:1, default=0.5, show_value=true))"""
+md"""Cross-correlation threshold $(@bind cc_threshold Slider(0.0:0.05:1, default=0.5, show_value=true))"""
 
 # ╔═╡ c4b39f91-8f0d-4f54-90b4-3c035a5b125f
-md"""minimum number of channels above threshold $(@bind nch_min Slider(0:length(data), default=4, show_value=true))"""
+md"""Minimum number of channels above threshold $(@bind nch_min Slider(0:length(data), default=4, show_value=true))"""
 
 # ╔═╡ c7f0582a-8997-4641-b607-0b95a7f73a6c
 v_p = 0.67345 # in cm/us
@@ -215,7 +215,7 @@ augmented_catalogue = let
 end
 
 # ╔═╡ b50df30e-f7c3-44f2-b759-3e4ca31003d9
-md"""Path of where ouput augmente catalogue $(@bind outputpath TextField(default="../data/2021-01-12_20-25-30/augmented_catalogue.csv"))"""
+md"""Path where ouput augmente catalogue $(@bind outputpath TextField(default="../data/2021-01-12_20-25-30/augmented_catalogue.csv"))"""
 
 # ╔═╡ 3784a5b2-8621-4bac-87a1-4decc25cf4f5
 CSV.write(outputpath, augmented_catalogue)
