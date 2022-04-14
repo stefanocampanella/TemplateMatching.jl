@@ -212,7 +212,7 @@ augmented_catalogue = let
 		matches_vec[n] = matches
 	end
 	augmented_catalogue = reduce(vcat, matches_vec)
-	tokeep = TemplateMatching.selectbypeaksdistance(augmented_catalogue.origin_time, augmented_catalogue.crosscorrelation, distance_threshold)
+	tokeep = TemplateMatching.selectbypeaksdistance(augmented_catalogue.origin_time, augmented_catalogue.crosscorrelation .* augmented_catalogue.nch, distance_threshold / samplefreq)
 	augmented_catalogue[tokeep, :]
 end
 

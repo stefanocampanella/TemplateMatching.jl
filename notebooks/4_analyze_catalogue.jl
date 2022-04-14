@@ -43,7 +43,10 @@ using Plots
 using StatsBase
 
 # ╔═╡ a7fcfdec-db16-4a40-b2f6-5c9c6f856ffc
+# ╠═╡ disabled = true
+#=╠═╡
 using Printf
+  ╠═╡ =#
 
 # ╔═╡ 33ff9417-b0b4-4f60-8c81-22c1181b37aa
 using MultivariateStats
@@ -90,6 +93,7 @@ templates = let
 	templates = DataFrame()
 	templates.datetime = DateTimeMicrosecond.(df.Year, df.Month, df.Day, df.Hour, df.Minute, sec, usec)
 	templates.sample = map(x -> round(Int, x.value * samplefreq), templates.datetime .- starttime)
+	templates.origin_time = templates.sample ./ samplefreq
 	templates.north = df.North
 	templates.east = df.East
 	templates.up = df.Up
@@ -100,19 +104,14 @@ end
 md"## Reading template matched catalogue"
 
 # ╔═╡ b62d7318-3a6d-4442-b6cc-3166b87dff8a
-md"""Path of the CSV template-match catalogue $(@bind cataloguepath TextField(default="../data/2021-01-12_20-25-30/templatematch.csv"))"""
+md"""Path of the CSV template-match catalogue $(@bind cataloguepath TextField(default="../data/2021-01-12_20-25-30/augmented_catalogue.csv"))"""
 
 # ╔═╡ c46997fc-9ab5-4678-bdd1-6874f77e7bca
-catalogue = let
-	df = CSV.read(cataloguepath, DataFrame, drop=[:datetime])
-	sort!(df, :sample)
-	tokeep = TemplateMatching.selectbypeaksdistance(df.origin_time, df.crosscorrelation, 600)
-	df[tokeep, :]
-end
+catalogue = CSV.read(cataloguepath, DataFrame)
 
 # ╔═╡ 08f3bb2c-c80e-43ff-814b-e17ae5a912dc
 scatter(catalogue[:, :origin_time],
-		templates[catalogue.template, :sample] ./ samplefreq,
+		templates[catalogue.template, :origin_time],
 		zcolor=catalogue.crosscorrelation,
 		c=:heat,
 		markersize=4exp.(catalogue.relative_magnitude),
@@ -123,12 +122,6 @@ scatter(catalogue[:, :origin_time],
    		right_margin = 3Plots.mm,
 		legend=nothing,
 		dpi=500)
-
-# ╔═╡ 12adae63-d4eb-44fd-a720-462c930a066b
-md"""Path of the output CSV $(@bind augmentedcataloguepath TextField(default="../data/2021-01-12_20-25-30/augmented_catalogue.csv"))"""
-
-# ╔═╡ f56f9852-c9d9-4093-a76d-7123d16ca3d1
-CSV.write(augmentedcataloguepath, catalogue)
 
 # ╔═╡ 102e4534-6be4-4436-be36-69726a393253
 md" ## Statistics of the detections "
@@ -160,6 +153,7 @@ summarystats(selection.relative_magnitude)
 md"## Animations"
 
 # ╔═╡ 6dddcebd-d730-470e-a831-154ee3102e0d
+#=╠═╡
 let nframes = 500, size_r = 0.8, alpha_r = 1e-6, data_len = Int(4e6)
 	@gif for n = range(1, data_len, nframes)
 		selection_upto = selection[selection.origin_time .<= n / samplefreq, :]
@@ -176,8 +170,11 @@ let nframes = 500, size_r = 0.8, alpha_r = 1e-6, data_len = Int(4e6)
 		end
 	end
 end
+  ╠═╡ =#
 
 # ╔═╡ 1d576253-f719-4f21-8cc2-e794399a6ad5
+# ╠═╡ disabled = true
+#=╠═╡
 let nframes = 500, size_r = 0.8, alpha_r = 1e-6, data_len = Int(4e6)
 	@gif for n = range(1, data_len, nframes)
 		selection_upto = selection[selection.sample .<= n, :]
@@ -198,6 +195,7 @@ let nframes = 500, size_r = 0.8, alpha_r = 1e-6, data_len = Int(4e6)
 		end
 	end
 end
+  ╠═╡ =#
 
 # ╔═╡ 0d237fe0-35bb-4624-a49a-6086c5d9ed09
 md"## Principal Component Analysis"
@@ -212,6 +210,8 @@ M = fit(PCA, X, maxoutdim=2)
 xlim, ylim = extrema(predict(M, X), dims=2)
 
 # ╔═╡ 2837928e-692a-42ee-a064-07a3042d3d7b
+# ╠═╡ disabled = true
+#=╠═╡
 let nframes = 500, data_len = Int(4e6)
 	@gif for n = range(1, data_len, nframes)
 		selection_upto = selection[selection.origin_time .<= n / samplefreq, :]
@@ -227,6 +227,7 @@ let nframes = 500, data_len = Int(4e6)
 		end
 	end
 end
+  ╠═╡ =#
 
 # ╔═╡ 3212d37b-e498-4711-a067-14dca93a91a8
 let
@@ -259,13 +260,11 @@ end
 # ╠═c76f6541-b0e2-4aba-9533-8ab6c23685bb
 # ╠═56c57ae9-5254-4dca-a793-bfdeee9a0ba5
 # ╟─57b35604-727b-4eac-bcbd-ea302e4c79a2
-# ╟─b62d7318-3a6d-4442-b6cc-3166b87dff8a
+# ╠═b62d7318-3a6d-4442-b6cc-3166b87dff8a
 # ╠═533d8e9e-40ff-4740-bbd9-8199cf0bcef6
 # ╠═f07ab63f-dfb4-493c-a40c-6b3363a858c3
 # ╠═c46997fc-9ab5-4678-bdd1-6874f77e7bca
 # ╠═08f3bb2c-c80e-43ff-814b-e17ae5a912dc
-# ╠═12adae63-d4eb-44fd-a720-462c930a066b
-# ╠═f56f9852-c9d9-4093-a76d-7123d16ca3d1
 # ╟─102e4534-6be4-4436-be36-69726a393253
 # ╠═356cc4c2-e565-4847-9286-cfc1f835654d
 # ╠═2ce75a18-b5d6-4e6f-81ce-875527b14092
