@@ -45,6 +45,9 @@ using TemplateMatching
 # ╔═╡ 4249c937-1b33-4aca-8351-d98a19c584fa
 using Tables
 
+# ╔═╡ 87df9037-d497-44e8-836d-3c34a58c5d07
+using StatsBase
+
 # ╔═╡ c2f22858-6d3c-4f92-a05b-659deae566f6
 md"## Reading Continuous Data"
 
@@ -56,6 +59,9 @@ data = load(datapath, "data")
 
 # ╔═╡ f7e0f70d-4069-4039-90b6-d3da559bdcb1
 samplefreq = 2 # MHz
+
+# ╔═╡ c7f0582a-8997-4641-b607-0b95a7f73a6c
+v_p = 0.67345 # in cm/us
 
 # ╔═╡ 57b35604-727b-4eac-bcbd-ea302e4c79a2
 md"## Reading events catalogue"
@@ -117,7 +123,7 @@ sensors_positions = let
 end
 
 # ╔═╡ 368f7fc1-0afc-439f-905a-76af04e8ca8d
-md" ## Computing the cross-correlations"
+md"## Processing the catalogue"
 
 # ╔═╡ 033473d3-6958-4e7b-8c95-a9e15d882118
 md"""
@@ -147,11 +153,8 @@ md"""Cross-correlation threshold $(@bind cc_threshold Slider(0.0:0.05:1, default
 # ╔═╡ c4b39f91-8f0d-4f54-90b4-3c035a5b125f
 md"""Minimum number of channels above threshold $(@bind nch_min Slider(0:length(data), default=4, show_value=true))"""
 
-# ╔═╡ c7f0582a-8997-4641-b607-0b95a7f73a6c
-v_p = 0.67345 # in cm/us
-
 # ╔═╡ afe1c12f-23d3-47af-bfe8-b59ca7018593
-function relocate_match(data_stream, template, match_offsets, guess, correlation_threshold, nch_min)
+function process_match(data_stream, template, match_offsets, guess, correlation_threshold, nch_min)
 	toas = estimatetoa.(data_stream, template, match_offsets, tolerance)
 	readings = copy(sensors_positions)
 	readings.index = 1:nrow(readings)
@@ -194,19 +197,18 @@ augmented_catalogue = let
 		peaks, heights = findpeaks(signal, height_threshold, distance_threshold)
 		# Computing magnitudes and relocating events
 		matches = DataFrame()
-		matches.sample = peaks .+ t_pre
-		matches.height = heights
+		matches.peak_sample = peaks .+ t_pre
+		matches.peak_height = heights
 		matches.template .= n
 		x0 = Vector(catalogue[n, [:north, :east, :up]])
-		coordinates = [relocate_match(data_stream, 
+		matches_data = [process_match(data_stream, 
 			                          template_data, 
 			                          peak .+ offsets, 
 			                          [x0; (peak + t_pre) / samplefreq],
 			                          cc_threshold, 
 			                          nch_min) 
-			           for peak in peaks]
-		matches = hcat(matches, DataFrame(coordinates))
-		matches.datetime = @. starttime + Microsecond(round(Int, matches.origin_time))
+			            for peak in peaks]
+		matches = hcat(matches, DataFrame(matches_data))
 		matches_vec[n] = matches
 	end
 	augmented_catalogue = reduce(vcat, matches_vec)
@@ -229,21 +231,23 @@ CSV.write(outputpath, augmented_catalogue)
 # ╠═f3f17c65-dab6-46da-83a9-87aad1181524
 # ╠═96cf6e3b-1c2b-49f6-979d-0fce28a55a06
 # ╠═f7e0f70d-4069-4039-90b6-d3da559bdcb1
+# ╠═c7f0582a-8997-4641-b607-0b95a7f73a6c
 # ╟─57b35604-727b-4eac-bcbd-ea302e4c79a2
 # ╠═3c07c33b-7f91-4e2d-a27a-09a8924f328c
 # ╠═b59dd2c0-4c3e-4c3d-a4d4-f8da9dcbe286
 # ╠═76e2e659-c708-4a08-8263-def6c3dfa930
-# ╠═b62d7318-3a6d-4442-b6cc-3166b87dff8a
+# ╟─b62d7318-3a6d-4442-b6cc-3166b87dff8a
 # ╠═1bf27aad-b754-4acc-b08d-fe1a86791de8
 # ╠═d5beeb75-7ca6-4f28-a63b-6e3070fb4c73
 # ╠═5d5f3ca7-260d-4dbb-bde1-59f2bd58c0c9
 # ╟─6ac6cce3-09ae-421a-b502-b5c8807bf555
-# ╠═cfceae8c-0967-4a47-93f5-2b6e3073624c
+# ╟─cfceae8c-0967-4a47-93f5-2b6e3073624c
 # ╠═be090485-7917-464a-8e8c-aec4a2c009d3
-# ╟─368f7fc1-0afc-439f-905a-76af04e8ca8d
+# ╠═368f7fc1-0afc-439f-905a-76af04e8ca8d
 # ╠═41b0f95e-d806-4167-8199-7392717782f9
 # ╠═342cbcff-5a05-4199-b5b5-6cc0fa70c202
 # ╠═4249c937-1b33-4aca-8351-d98a19c584fa
+# ╠═87df9037-d497-44e8-836d-3c34a58c5d07
 # ╟─033473d3-6958-4e7b-8c95-a9e15d882118
 # ╟─1ba147d6-2609-4d83-a734-6bf91445a23c
 # ╟─7d1f1903-8342-4715-8e88-3e3d063ea5db
@@ -251,8 +255,7 @@ CSV.write(outputpath, augmented_catalogue)
 # ╟─0d122aef-1767-4389-b043-97d07ecef1fe
 # ╟─ef346f24-ab46-407b-95a0-2bce10b41ac8
 # ╟─c4b39f91-8f0d-4f54-90b4-3c035a5b125f
-# ╠═c7f0582a-8997-4641-b607-0b95a7f73a6c
 # ╠═afe1c12f-23d3-47af-bfe8-b59ca7018593
 # ╠═666c8d5f-c1c5-4cb4-9364-bf997b18a683
-# ╠═b50df30e-f7c3-44f2-b759-3e4ca31003d9
+# ╟─b50df30e-f7c3-44f2-b759-3e4ca31003d9
 # ╠═3784a5b2-8621-4bac-87a1-4decc25cf4f5
