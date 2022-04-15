@@ -43,10 +43,7 @@ using Plots
 using StatsBase
 
 # ╔═╡ a7fcfdec-db16-4a40-b2f6-5c9c6f856ffc
-# ╠═╡ disabled = true
-#=╠═╡
 using Printf
-  ╠═╡ =#
 
 # ╔═╡ 33ff9417-b0b4-4f60-8c81-22c1181b37aa
 using MultivariateStats
@@ -106,15 +103,33 @@ md"## Reading template matched catalogue"
 # ╔═╡ b62d7318-3a6d-4442-b6cc-3166b87dff8a
 md"""Path of the CSV template-match catalogue $(@bind cataloguepath TextField(default="../data/2021-01-12_20-25-30/augmented_catalogue.csv"))"""
 
-# ╔═╡ c46997fc-9ab5-4678-bdd1-6874f77e7bca
+# ╔═╡ 6c04792e-7438-4e36-a3cf-4d81da6a772c
 catalogue = CSV.read(cataloguepath, DataFrame)
 
+# ╔═╡ 102e4534-6be4-4436-be36-69726a393253
+md" ## Statistics of the detections "
+
+# ╔═╡ 2ce75a18-b5d6-4e6f-81ce-875527b14092
+selection = let
+	df = copy(catalogue)
+	# Skip matches without enough channels
+	dropmissing!(df)
+	# Skip matches with low cc 
+	filter!(row -> row.crosscorrelation > 0.7 && row.nch > 6, df)
+	# Select one template per match
+	sort!(df, :origin_time)
+	tokeep = TemplateMatching.selectbypeaksdistance(df.origin_time, df.crosscorrelation .* df.nch, 600)
+	df = df[tokeep, :]
+	# Drop funny relocalization residuals
+	df[.!TemplateMatching.mad_test(df.multilateration_residual), :]
+end
+
 # ╔═╡ 08f3bb2c-c80e-43ff-814b-e17ae5a912dc
-scatter(catalogue[:, :origin_time],
-		templates[catalogue.template, :origin_time],
-		zcolor=catalogue.crosscorrelation,
+scatter(selection[:, :origin_time],
+		templates[selection.template, :origin_time],
+		zcolor=selection.crosscorrelation,
 		c=:heat,
-		markersize=4exp.(catalogue.relative_magnitude),
+		markersize=4exp.(selection.relative_magnitude),
 		ylabel="Template origin [μs]",
 		xlabel="Detection origin [μs]",
 		colorbar=:right,
@@ -123,37 +138,37 @@ scatter(catalogue[:, :origin_time],
 		legend=nothing,
 		dpi=500)
 
-# ╔═╡ 102e4534-6be4-4436-be36-69726a393253
-md" ## Statistics of the detections "
-
-# ╔═╡ 2ce75a18-b5d6-4e6f-81ce-875527b14092
-selection = let
-	# Skip matches without enough channels
-	relocatable_matches = dropmissing(catalogue)
-	# Skip matches with residuals too large or small
-	relocatable_matches[.!TemplateMatching.mad_test(relocatable_matches.multilateration_residual), :]
-end
-
 # ╔═╡ 567cbd00-b375-417f-a7f5-8ac9a4bc4c7f
 nontemplates = @. !(selection.crosscorrelation > 0.999 && selection.relative_magnitude ≈ 0.0)
 
 # ╔═╡ feebcd5f-91c4-4a70-a064-e642e3172614
-histogram(selection[nontemplates, :crosscorrelation], label=nothing)
+histogram(selection[nontemplates, :crosscorrelation], label=nothing, title="Cross-correlation")
 
 # ╔═╡ 476101af-0108-4628-9ac1-f233a456a869
 summarystats(selection[nontemplates, :crosscorrelation])
 
 # ╔═╡ 3be237b0-9f19-4e9a-aa13-c6355771b8e8
-histogram(selection[nontemplates, :relative_magnitude], label=nothing)
+histogram(selection[nontemplates, :relative_magnitude], label=nothing, title="Relative magnitude")
 
 # ╔═╡ 7453767a-e8f5-4446-b198-fbe48c992aa5
 summarystats(selection.relative_magnitude)
+
+# ╔═╡ df8156eb-0061-4523-ba02-d7bb7eb4d9cb
+histogram(selection[nontemplates, :nch], label=nothing, title="Num channels")
+
+# ╔═╡ 97925230-7397-4cec-bce7-f15b3479b791
+summarystats(selection[nontemplates, :nch])
+
+# ╔═╡ 1f4c95b0-851b-4a91-bba6-3240cf312bf2
+histogram(selection[nontemplates, :multilateration_residual], label=nothing, title="Multilateration residual")
+
+# ╔═╡ 28efc2c9-ce88-4041-a84f-eda2845085e8
+summarystats(selection[nontemplates, :multilateration_residual])
 
 # ╔═╡ 2f98cf67-87ee-4f12-a507-b2259d780ffd
 md"## Animations"
 
 # ╔═╡ 6dddcebd-d730-470e-a831-154ee3102e0d
-#=╠═╡
 let nframes = 500, size_r = 0.8, alpha_r = 1e-6, data_len = Int(4e6)
 	@gif for n = range(1, data_len, nframes)
 		selection_upto = selection[selection.origin_time .<= n / samplefreq, :]
@@ -170,18 +185,15 @@ let nframes = 500, size_r = 0.8, alpha_r = 1e-6, data_len = Int(4e6)
 		end
 	end
 end
-  ╠═╡ =#
 
 # ╔═╡ 1d576253-f719-4f21-8cc2-e794399a6ad5
-# ╠═╡ disabled = true
-#=╠═╡
 let nframes = 500, size_r = 0.8, alpha_r = 1e-6, data_len = Int(4e6)
 	@gif for n = range(1, data_len, nframes)
-		selection_upto = selection[selection.sample .<= n, :]
+		selection_upto = selection[selection.peak_sample .<= n, :]
 		if !isempty(selection_upto)
 			count_upto = combine(groupby(selection_upto, :template), nrow => :count)
-			lastsample_upto = combine(groupby(selection_upto, :template), :sample => maximum)
-			alphas = @. exp10(alpha_r * (lastsample_upto[:, :sample_maximum] - n))
+			lastsample_upto = combine(groupby(selection_upto, :template), :peak_sample => maximum)
+			alphas = @. exp10(alpha_r * (lastsample_upto[:, :peak_sample_maximum] - n))
 	    	scatter(templates[count_upto[!, :template], :east],
 					templates[count_upto[!, :template], :north],
 					templates[count_upto[!, :template], :up],
@@ -195,7 +207,6 @@ let nframes = 500, size_r = 0.8, alpha_r = 1e-6, data_len = Int(4e6)
 		end
 	end
 end
-  ╠═╡ =#
 
 # ╔═╡ 0d237fe0-35bb-4624-a49a-6086c5d9ed09
 md"## Principal Component Analysis"
@@ -210,8 +221,6 @@ M = fit(PCA, X, maxoutdim=2)
 xlim, ylim = extrema(predict(M, X), dims=2)
 
 # ╔═╡ 2837928e-692a-42ee-a064-07a3042d3d7b
-# ╠═╡ disabled = true
-#=╠═╡
 let nframes = 500, data_len = Int(4e6)
 	@gif for n = range(1, data_len, nframes)
 		selection_upto = selection[selection.origin_time .<= n / samplefreq, :]
@@ -227,7 +236,6 @@ let nframes = 500, data_len = Int(4e6)
 		end
 	end
 end
-  ╠═╡ =#
 
 # ╔═╡ 3212d37b-e498-4711-a067-14dca93a91a8
 let
@@ -235,15 +243,29 @@ let
 	plot(fit(Histogram, (Y[1, :], Y[2, :]), nbins=64))
 end
 
-# ╔═╡ 48bf7fda-607b-44fe-85aa-4e57ad9c565a
-projection(M)
-
 # ╔═╡ 04d6e989-3fd0-4efd-a570-0ae34164cf4f
 let
 	Y = predict(M, X)
 	Z = norm.(eachcol(X .- reconstruct(M, Y)))
-	selection = Z .< percentile(Z, 90)
-	scatter(Y[1, selection], Y[2, selection], zcolor=Z[selection], c=:heat, markersize=2.5, label="")
+	histogram(Z)
+end
+
+# ╔═╡ 432b6d5c-edef-402d-b207-a27b2dba18d1
+md"## Candidate Repeaters"
+
+# ╔═╡ c893eaba-5393-47ec-aff3-57352e515de4
+repeaters = sort(filter(row -> row.crosscorrelation > 0.95, selection[nontemplates, :]), :template)
+
+# ╔═╡ 9817148b-401b-45a8-ad0b-657502d6cb2f
+scatter(repeaters.north, repeaters.east, repeaters.up)
+
+# ╔═╡ 947f37b9-f8f9-482b-aca6-b28c90e1f5da
+let
+	templates = .!nontemplates
+	df = vcat(repeaters, selection[templates, :])
+	clusters = groupby(df, :template)
+	errors = combine(clusters, ([:north, :east, :up] .=> std))
+	map(col -> mean(filter(!isnan, errors[!, col])), [:north_std, :east_std, :up_std])
 end
 
 # ╔═╡ Cell order:
@@ -263,16 +285,20 @@ end
 # ╠═b62d7318-3a6d-4442-b6cc-3166b87dff8a
 # ╠═533d8e9e-40ff-4740-bbd9-8199cf0bcef6
 # ╠═f07ab63f-dfb4-493c-a40c-6b3363a858c3
-# ╠═c46997fc-9ab5-4678-bdd1-6874f77e7bca
-# ╠═08f3bb2c-c80e-43ff-814b-e17ae5a912dc
+# ╠═6c04792e-7438-4e36-a3cf-4d81da6a772c
 # ╟─102e4534-6be4-4436-be36-69726a393253
 # ╠═356cc4c2-e565-4847-9286-cfc1f835654d
 # ╠═2ce75a18-b5d6-4e6f-81ce-875527b14092
+# ╠═08f3bb2c-c80e-43ff-814b-e17ae5a912dc
 # ╠═567cbd00-b375-417f-a7f5-8ac9a4bc4c7f
-# ╠═feebcd5f-91c4-4a70-a064-e642e3172614
-# ╠═476101af-0108-4628-9ac1-f233a456a869
-# ╠═3be237b0-9f19-4e9a-aa13-c6355771b8e8
+# ╟─feebcd5f-91c4-4a70-a064-e642e3172614
+# ╟─476101af-0108-4628-9ac1-f233a456a869
+# ╟─3be237b0-9f19-4e9a-aa13-c6355771b8e8
 # ╟─7453767a-e8f5-4446-b198-fbe48c992aa5
+# ╟─df8156eb-0061-4523-ba02-d7bb7eb4d9cb
+# ╟─97925230-7397-4cec-bce7-f15b3479b791
+# ╟─1f4c95b0-851b-4a91-bba6-3240cf312bf2
+# ╟─28efc2c9-ce88-4041-a84f-eda2845085e8
 # ╟─2f98cf67-87ee-4f12-a507-b2259d780ffd
 # ╠═a7fcfdec-db16-4a40-b2f6-5c9c6f856ffc
 # ╠═6dddcebd-d730-470e-a831-154ee3102e0d
@@ -285,5 +311,8 @@ end
 # ╠═2837928e-692a-42ee-a064-07a3042d3d7b
 # ╠═3ec5251a-2e3e-4344-bb1f-fcd79daf9714
 # ╠═3212d37b-e498-4711-a067-14dca93a91a8
-# ╠═48bf7fda-607b-44fe-85aa-4e57ad9c565a
 # ╠═04d6e989-3fd0-4efd-a570-0ae34164cf4f
+# ╠═432b6d5c-edef-402d-b207-a27b2dba18d1
+# ╠═c893eaba-5393-47ec-aff3-57352e515de4
+# ╠═9817148b-401b-45a8-ad0b-657502d6cb2f
+# ╠═947f37b9-f8f9-482b-aca6-b28c90e1f5da

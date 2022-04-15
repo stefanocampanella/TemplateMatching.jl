@@ -211,9 +211,7 @@ augmented_catalogue = let
 		matches = hcat(matches, DataFrame(matches_data))
 		matches_vec[n] = matches
 	end
-	augmented_catalogue = reduce(vcat, matches_vec)
-	tokeep = TemplateMatching.selectbypeaksdistance(augmented_catalogue.origin_time, augmented_catalogue.crosscorrelation .* augmented_catalogue.nch, distance_threshold / samplefreq)
-	augmented_catalogue[tokeep, :]
+	reduce(vcat, matches_vec)
 end
 
 # ╔═╡ b50df30e-f7c3-44f2-b759-3e4ca31003d9
