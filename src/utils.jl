@@ -13,14 +13,14 @@ true
 ```
 """
 function subsampleshift(waveform::AbstractVector{<:AbstractFloat}, quantity; algorithm=BSpline(Cubic(Interpolations.Flat(OnGrid()))))
-	if abs(quantity) > 1.0
-		throw(ArgumentError("Shift should be less than 1.0, got $quantity"))
-	else
-		xs = axes(waveform, 1)
-		itp = interpolate(waveform, algorithm)
-		ext = extrapolate(itp, Interpolations.Flat())
-		@. ext(xs + quantity)
-	end
+    if abs(quantity) > 1.0
+        throw(ArgumentError("Shift should be less than 1.0, got $quantity"))
+    else
+        xs = axes(waveform, 1)
+        itp = interpolate(waveform, algorithm)
+        ext = extrapolate(itp, Interpolations.Flat())
+        @. ext(xs + quantity)
+    end
 end
 
 """
@@ -80,16 +80,16 @@ julia> let v = sin.(range(0, pi, 256)), x = [zeros(128); v; zeros(128)], y = Tem
 ```
 """
 function estimatetoa(trace, waveform, center, tol)
-	a, b = max(firstindex(trace), center - tol), min(lastindex(trace), center + tol + length(waveform) - 1)
-	cc = OffsetVector(crosscorrelate(view(trace, a:b), waveform), center - tol - 1)
-	cc_max, n_max = findmax_window(cc, center, tol)
-	if firstindex(cc) < n_max < lastindex(cc) && cc_max < 1.0 && cc_max ≉ 1.0
-		y1, y2, y3 = cc[n_max - 1:n_max + 1]
-		delta = (y1 - y3) / 2(y1 - 2y2 + y3)
-		n_max + delta, min(1.0, y2 + (y3 - y1) / 4delta)
-	else
-		Float64(n_max), cc_max
-	end
+    a, b = max(firstindex(trace), center - tol), min(lastindex(trace), center + tol + length(waveform) - 1)
+    cc = OffsetVector(crosscorrelate(view(trace, a:b), waveform), center - tol - 1)
+    cc_max, n_max = findmax_window(cc, center, tol)
+    if firstindex(cc) < n_max < lastindex(cc) && cc_max < 1.0 && cc_max ≉ 1.0
+        y1, y2, y3 = cc[n_max - 1:n_max + 1]
+        delta = (y1 - y3) / 2(y1 - 2y2 + y3)
+        n_max + delta, min(1.0, y2 + (y3 - y1) / 4delta)
+    else
+        Float64(n_max), cc_max
+    end
 end
 
 function line_element(xt, v)
