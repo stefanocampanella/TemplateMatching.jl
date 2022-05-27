@@ -55,15 +55,20 @@ function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}
     end
 
     N = length(template)
-    cc = Vector{element_type}(undef, length(series) - N + 1)
+    cc = similar(series, element_type, length(series) - N + 1)
     x = similar(y) 
+    crosscorrelatekernel!(cc, series, x, y, N)
+    cc
+end
+
+function crosscorrelatekernel!(cc, series, x, y, N)
     for n in eachindex(cc)
         series_view = view(series, n:n + N - 1)
         series_view_std = std(series_view, corrected=false)
         @. x = series_view / series_view_std
-        cc[n] = dot(x, y) / N
+        @inbounds cc[n] = dot(x, y) / N
     end
-    cc
+    return
 end
 
 """
