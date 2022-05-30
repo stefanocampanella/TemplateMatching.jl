@@ -37,7 +37,7 @@ julia> crosscorrelate(sin.(0:0.25pi:2pi), [1, 1+√2, 1])
 ```
 """
 function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}, element_type::Type{T3}=Float64; 
-    normalize_template=true) where {T1 <: Number, T2 <: Number, T3 <: AbstractFloat}
+    normalize_template=true, direct=true) where {T1 <: Number, T2 <: Number, T3 <: AbstractFloat}
     
     if isempty(series)
         throw(ArgumentError("Series must be a non-empty vector."))
@@ -49,26 +49,31 @@ function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}
 
     if normalize_template
         template_mean, template_std = mean_and_std(template, corrected=false)
-        y = @. (template - template_mean) / template_std
-    else
-        y = template
+        template = @. (template - template_mean) / template_std
     end
 
-    N = length(template)
-    cc = similar(series, element_type, length(series) - N + 1)
-    x = similar(y) 
-    crosscorrelatekernel!(cc, series, x, y, N)
+    cc = similar(series, element_type, length(series) - length(template) + 1)
+    if direct
+        crosscorrelatedirect!(cc, series, template)
+    else
+        crosscorrelatefft!(cc, series, template)
+    end
     cc
 end
 
-function crosscorrelatekernel!(cc, series, x, y, N)
+function crosscorrelatedirect!(cc, series, template)
+    N = length(template)
+    series_segment = similar(template) 
     for n in eachindex(cc)
-        series_view = view(series, n:n + N - 1)
-        series_view_std = std(series_view, corrected=false)
-        @. x = series_view / series_view_std
-        @inbounds cc[n] = dot(x, y) / N
+        segment_view = view(series, n:n + N - 1)
+        segment_std = std(segment_view, corrected=false)
+        @. series_segment = segment_view / segment_std
+        @inbounds cc[n] = dot(series_segment, template) / N
     end
-    return
+end
+
+function crosscorrelatefft!(cc, series, template)
+    throw(ErrorException("Not yet implemented."))
 end
 
 """
