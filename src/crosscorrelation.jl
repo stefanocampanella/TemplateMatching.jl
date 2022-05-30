@@ -73,7 +73,14 @@ function crosscorrelatedirect!(cc, series, template)
 end
 
 function crosscorrelatefft!(cc, series, template)
-    throw(ErrorException("Not yet implemented."))
+    L = nextpow(2, length(series) + length(template) - 1)
+    x = [series; zeros(eltype(series), L - length(series))]
+    y = [template; zeros(eltype(template), L - length(template))]
+    cc_fft = irfft(rfft(x) .* conj(rfft(y)), L)
+    N = length(template)
+    for n = axes(cc, 1)
+        @inbounds cc[n] = cc_fft[n] / (N * std(view(series, n:n + N), corrected=false))
+    end
 end
 
 """

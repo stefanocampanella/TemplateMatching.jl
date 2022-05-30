@@ -1,6 +1,7 @@
 module TemplateMatching
 
 using StatsBase
+using FFTW
 using LinearAlgebra
 using OffsetArrays
 using Interpolations
