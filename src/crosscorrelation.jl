@@ -73,14 +73,36 @@ function crosscorrelatedirect!(cc, series, template)
 end
 
 function crosscorrelatefft!(cc, series, template)
-    L = nextpow(2, length(series) + length(template) - 1)
-    x = [series; zeros(eltype(series), L - length(series))]
-    y = [template; zeros(eltype(template), L - length(template))]
-    cc_fft = irfft(rfft(x) .* conj(rfft(y)), L)
+    M = length(series)
     N = length(template)
-    for n = axes(cc, 1)
-        @inbounds cc[n] = cc_fft[n] / (N * std(view(series, n:n + N), corrected=false))
-    end
+    L = nextpow(2, M + N - 1)
+
+    x = similar(series, L)
+    x[1:M] .= series
+    x[M+1:L] .= zero(eltype(series))
+
+    y = similar(template, L)
+    y[1:N] .= template
+    y[N+1:L] .= zero(eltype(template))
+
+    cc_fft = irfft(rfft(x) .* conj(rfft(y)), L)
+    cc_norm = N .* moving_sum(x .* x, N) .- moving_sum(x, N).^2
+    mask = cc_norm .<= 0.0
+    cc_fft[mask] .= zero(eltype(cc_fft))
+    cc_norm[mask] .= one(eltype(cc_norm))
+    cc_norm .= sqrt.(cc_norm)
+    
+    cc .= view(cc_fft, axes(cc, 1)) ./ view(cc_norm, axes(cc, 1))
+end
+
+function moving_sum(data, window)
+    N = length(data)
+    msum = similar(data)
+    csum = cumsum(data)
+    msum[1] = csum[window]
+    msum[2:N - window + 1] .= view(csum, window + 1:N) .- view(csum, 1:N - window)
+    msum[N - window + 2:N] .= 0.0
+    msum
 end
 
 """
@@ -152,7 +174,7 @@ are aligned using `offsets` and averaged. If `tolerance`` is not zero, then the 
 misplacement of each series by `tolerance` sample, and return the average of the maximum cross-correlation 
 compatible with that misplacement.
 """
-function correlatetemplate(data, template, offsets, tolerance, element_type=Float64)
+function correlatetemplate(data, template, offsets, tolerance, element_type=Float64; direct=false)
     if isempty(data)
         throw(ArgumentError("Data must be non-empty."))
     elseif !(length(data) == length(template) == length(offsets))
@@ -160,7 +182,7 @@ function correlatetemplate(data, template, offsets, tolerance, element_type=Floa
     end
     correlations = similar(data, Vector{element_type})
     Threads.@threads for n = eachindex(data)
-        correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type), tolerance)
+        correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type, direct=direct), tolerance)
     end
     stack(correlations, offsets)
 end
