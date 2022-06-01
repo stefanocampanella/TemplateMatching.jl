@@ -63,7 +63,7 @@ end
 
 function crosscorrelatedirect!(cc, series, template)
     N = length(template)
-    series_segment = similar(template) 
+    series_segment = similar(template)
     for n in eachindex(cc)
         segment_view = view(series, n:n + N - 1)
         segment_std = std(segment_view, corrected=false)
@@ -72,27 +72,39 @@ function crosscorrelatedirect!(cc, series, template)
     end
 end
 
-function crosscorrelatefft!(cc, series, template)
+const nextfastsize = Dict{Int, Int}()
+# Valid for both FFTW and cuFFT
+const smoothfactors = Set([2, 3, 5, 7])
+
+function crosscorrelatefft!(cc::AbstractVector{T}, series, template) where {T <: AbstractFloat}
     M = length(series)
     N = length(template)
-    L = nextpow(2, M + N - 1)
+    min_size = M + N - 1
+    if min_size in keys(nextfastsize)
+        L = nextfastsize[min_size]
+    else
+        L = min_size
+        while !issubset(factor(Set, L), smoothfactors)
+            L += 1
+        end
+        nextfastsize[min_size] = L
+    end
 
-    x = similar(series, L)
+    x = similar(series, T, L)
     x[1:M] .= series
-    x[M+1:L] .= zero(eltype(series))
+    x[M + 1:L] .= zero(T)
 
-    y = similar(template, L)
+    y = similar(template, T, L)
     y[1:N] .= template
-    y[N+1:L] .= zero(eltype(template))
+    y[N+1:L] .= zero(T)
 
-    cc_fft = irfft(rfft(x) .* conj(rfft(y)), L)
-    cc_norm = N .* moving_sum(x .* x, N) .- moving_sum(x, N).^2
-    mask = cc_norm .<= 0.0
-    cc_fft[mask] .= zero(eltype(cc_fft))
-    cc_norm[mask] .= one(eltype(cc_norm))
-    cc_norm .= sqrt.(cc_norm)
+    cc_ifft = irfft(rfft(x) .* conj.(rfft(y)), L)
+    cc_norm_squared = N .* moving_sum(x .* x, N) .- moving_sum(x, N).^2
+    mask = cc_norm_squared .<= 0.0
+    cc_ifft[mask] .= zero(eltype(cc_ifft))
+    cc_norm_squared[mask] .= one(eltype(cc_norm_squared))
     
-    cc .= view(cc_fft, axes(cc, 1)) ./ view(cc_norm, axes(cc, 1))
+    cc .= view(cc_ifft, axes(cc, 1)) ./ sqrt.(view(cc_norm_squared, axes(cc, 1)))
 end
 
 function moving_sum(data, window)

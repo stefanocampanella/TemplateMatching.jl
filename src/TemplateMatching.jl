@@ -1,6 +1,7 @@
 module TemplateMatching
 
 using StatsBase
+using Primes
 using FFTW
 using LinearAlgebra
 using OffsetArrays
