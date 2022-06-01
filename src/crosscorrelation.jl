@@ -111,8 +111,8 @@ function moving_sum(data, window)
     N = length(data)
     msum = similar(data)
     csum = cumsum(data)
-    msum[1] = csum[window]
-    msum[2:N - window + 1] .= view(csum, window + 1:N) .- view(csum, 1:N - window)
+    msum[1:N - window + 1] .= view(csum, window:N)
+    msum[2:N - window + 1] .-= view(csum, 1:N - window)
     msum[N - window + 2:N] .= 0.0
     msum
 end
