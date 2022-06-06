@@ -37,7 +37,7 @@ julia> crosscorrelate(sin.(0:0.25pi:2pi), [1, 1+√2, 1])
 ```
 """
 function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}, element_type::Type{T3}=Float64; 
-    normalize_template=true, direct=true) where {T1 <: Number, T2 <: Number, T3 <: AbstractFloat}
+    normalize_template=true, fast=true) where {T1 <: Number, T2 <: Number, T3 <: AbstractFloat}
     
     if isempty(series)
         throw(ArgumentError("Series must be a non-empty vector."))
@@ -53,10 +53,10 @@ function crosscorrelate(series::AbstractVector{T1}, template::AbstractVector{T2}
     end
 
     cc = similar(series, element_type, length(series) - length(template) + 1)
-    if direct
-        crosscorrelatedirect!(cc, series, template)
-    else
+    if fast || isa(series, CuVector)
         crosscorrelatefft!(cc, series, template)
+    else
+        crosscorrelatedirect!(cc, series, template)
     end
     cc
 end
@@ -213,7 +213,7 @@ are aligned using `offsets` and averaged. If `tolerance`` is not zero, then the 
 misplacement of each series by `tolerance` sample, and return the average of the maximum cross-correlation 
 compatible with that misplacement.
 """
-function correlatetemplate(data, template, offsets, tolerance, element_type=Float64; direct=false)
+function correlatetemplate(data, template, offsets, tolerance, element_type=Float64; fast=true)
     if isempty(data)
         throw(ArgumentError("Data must be non-empty."))
     elseif !(length(data) == length(template) == length(offsets))
@@ -221,7 +221,7 @@ function correlatetemplate(data, template, offsets, tolerance, element_type=Floa
     end
     correlations = similar(data, Vector{element_type})
     Threads.@threads for n = eachindex(data)
-        correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type, direct=direct), tolerance)
+        correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type, fast=fast), tolerance)
     end
     stack(correlations, offsets)
 end
