@@ -3,6 +3,7 @@ module TemplateMatching
 using StatsBase
 using Primes
 using FFTW
+using CUDA
 using LinearAlgebra
 using OffsetArrays
 using Interpolations

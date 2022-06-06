@@ -3,6 +3,7 @@ using Test
 using StatsBase
 using LinearAlgebra
 using OffsetArrays
+using CUDA
 
 
 
@@ -18,7 +19,12 @@ using OffsetArrays
                 y = @view x[45:55]
                 y_mean, y_std = mean_and_std(y, corrected=false)
                 z = @. (y - y_mean) / y_std
-                @test all(crosscorrelate(x, z, type, normalize_template=false, direct=direct) .≈ crosscorrelate(x, y, type, direct=direct) )
+                @test all(crosscorrelate(x, z, type, normalize_template=false, direct=direct) .≈ crosscorrelate(x, y, type, direct=direct))
+                if CUDA.functional()
+                    x_d = CuArray(x)
+                    z_d = CuArray(z)
+                    @test all(crosscorrelate(x_d, z_d, type, normalize_template=false, direct=direct) .≈ crosscorrelate(x, y, type, direct=direct))
+                end
             end
             let 
                 x = @. 1e3 * ($rand(type, 100) - 0.5)
@@ -26,6 +32,13 @@ using OffsetArrays
                 cc, indx = findmax(crosscorrelate(x, y, type, direct=direct))
                 @test cc ≈ 1.0 
                 @test indx == 45
+                if CUDA.functional()
+                    x_d = CuArray(x)
+                    y_d = CuArray(y)
+                    cc, indx = findmax(crosscorrelate(x_d, y_d, type, direct=direct))
+                    @test cc ≈ 1.0 
+                    @test indx == 45
+                end
             end
         end
     end
@@ -57,6 +70,13 @@ using OffsetArrays
                 cc, indx = findmax(correlatetemplate(data, template, shifts, 0, type, direct=direct))
                 @test cc ≈ 1.0 
                 @test indx == 0
+                if CUDA.functional()
+                    data_d = CuArray.(data)
+                    template_d = CuArray.(template)
+                    cc, indx = findmax(Array(correlatetemplate(data_d, template_d, shifts, 0, type, direct=direct)))
+                    @test cc ≈ 1.0 
+                    @test indx == 0
+                end
             end
         end
     end

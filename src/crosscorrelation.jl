@@ -146,12 +146,35 @@ function maxfilter(x::AbstractVector, l)
     y
 end
 
-function maxfilter!(y, x, l)
+function maxfilter!(y::AbstractVector, x::AbstractVector, l::Integer)
     for n in eachindex(x)
         lower = max(n - l, firstindex(x))
         upper = min(n + l, lastindex(x))
         @inbounds y[n] = maximum(view(x, lower:upper))
     end
+end
+
+function maxfilter!(y::CuVector, x::CuVector, l::Integer)
+    kernel = @cuda launch=false maxfilter_gpukernel!(y, x, l)
+    config = launch_configuration(kernel.fun)
+    threads = min(length(y), config.threads)
+    blocks = cld(length(y), threads)
+    kernel(y, x, l; threads, blocks)
+end
+
+function maxfilter_gpukernel!(y::CuVector, x::CuVector, l::Integer)
+    index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+    stride = gridDim().x * blockDim().x
+    for n in index:stride:length(x)
+        lower = max(n - l, firstindex(x))
+        upper = min(n + l, lastindex(x))
+        x_max = x[lower]
+        for k in lower + 1:upper
+            x_max = x_max > x[k] ? x_max : x[k]
+        end
+        @inbounds y[n] = x_max 
+    end
+    return
 end
 
 """
