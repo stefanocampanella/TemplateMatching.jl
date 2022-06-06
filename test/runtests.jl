@@ -5,7 +5,9 @@ using LinearAlgebra
 using OffsetArrays
 using CUDA
 
-
+if CUDA.functional()
+    @info "Testing on GPU" CUDA.version()
+end
 
 @testset verbose = true "TemplateMatching.jl" begin
     @testset "Cross-correlate" begin
@@ -23,7 +25,7 @@ using CUDA
                 if fast && CUDA.functional()
                     x_d = CuArray(x)
                     z_d = CuArray(z)
-                    @test all(crosscorrelate(x_d, z_d, type, normalize_template=false) .≈ crosscorrelate(x, y, type))
+                    @test all(crosscorrelate(x_d, z_d, type, normalize_template=false) .≈ crosscorrelate(x_d, y_d, type))
                 end
             end
             let 
@@ -73,7 +75,7 @@ using CUDA
                 if fast && CUDA.functional()
                     data_d = CuArray.(data)
                     template_d = CuArray.(template)
-                    cc, indx = findmax(Array(correlatetemplate(data_d, template_d, shifts, 0, type)))
+                    cc, indx = findmax(correlatetemplate(data_d, template_d, shifts, 0, type))
                     @test cc ≈ 1.0 
                     @test indx == 0
                 end
