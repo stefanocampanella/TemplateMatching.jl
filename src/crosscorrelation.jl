@@ -162,7 +162,7 @@ function maxfilter!(y::CuVector, x::CuVector, l::Integer)
     kernel(y, x, l; threads, blocks)
 end
 
-function maxfilter_gpukernel!(y::CuVector, x::CuVector, l::Integer)
+function maxfilter_gpukernel!(y, x, l)
     index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
     stride = gridDim().x * blockDim().x
     for n in index:stride:length(x)
