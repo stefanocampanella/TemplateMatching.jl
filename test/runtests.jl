@@ -6,7 +6,7 @@ using OffsetArrays
 using CUDA
 
 if CUDA.functional()
-    @info "Testing on GPU" CUDA.version()
+    @info "Running GPU tests" CUDA.version()
 end
 
 @testset verbose = true "TemplateMatching.jl" begin
@@ -25,7 +25,7 @@ end
                 if fast && CUDA.functional()
                     x_d = CuArray(x)
                     z_d = CuArray(z)
-                    @test all(crosscorrelate(x_d, z_d, type, normalize_template=false) .≈ crosscorrelate(x_d, y_d, type))
+                    @test all(crosscorrelate(x_d, z_d, type, normalize_template=false) .≈ crosscorrelate(x_d, z_d, type))
                 end
             end
             let 
