@@ -25,7 +25,7 @@ on cross-correlation for more details.
 # Examples
 
 ```jldoctest
-julia> crosscorrelate(sin.(0:0.25pi:2pi), [1, 1+√2, 1])
+julia> crosscorrelate(sin.(0:0.25pi:2pi), [1, 1+√2, 1], fast=false)
 7-element Vector{Float64}:
   0.23258781949447394
   1.000000000000001
