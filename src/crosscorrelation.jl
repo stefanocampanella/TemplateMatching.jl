@@ -142,12 +142,16 @@ julia> maxfilter(sin.(0:0.25pi:2pi), 1)
 """
 function maxfilter(x::AbstractVector, l)
     y = similar(x)
+    maxfilter!(y, x, l)
+    y
+end
+
+function maxfilter!(y, x, l)
     for n in eachindex(x)
         lower = max(n - l, firstindex(x))
         upper = min(n + l, lastindex(x))
-        y[n] = maximum(view(x, lower:upper))
+        @inbounds y[n] = maximum(view(x, lower:upper))
     end
-    y
 end
 
 """
@@ -194,7 +198,7 @@ function correlatetemplate(data, template, offsets, tolerance, element_type=Floa
     end
     correlations = similar(data, Vector{element_type})
     Threads.@threads for n = eachindex(data)
-        correlations[n] = maxfilter(Vector{element_type}(crosscorrelate(data[n], template[n], element_type, direct=direct)), tolerance)
+        correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type, direct=direct), tolerance)
     end
     stack(correlations, offsets)
 end
