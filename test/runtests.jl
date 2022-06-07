@@ -70,13 +70,13 @@ end
                 template = [view(data[n], 45 + n:55 + n) for n = eachindex(data)]
                 shifts = [45 + n for n = eachindex(data)]
                 cc, indx = findmax(correlatetemplate(data, template, shifts, 0, type, usefft=usefft))
-                @test cc ≈ 1.0 
+                @test isapprox(1.0, cc, atol=1e-5)
                 @test indx == 0
                 if usefft && CUDA.functional()
                     data_d = CuArray.(data)
                     template_d = CuArray.(template)
                     cc, indx = findmax(correlatetemplate(data_d, template_d, shifts, 0, type))
-                    @test cc ≈ 1.0 
+                    @test isapprox(1.0, cc, atol=1e-5)
                     @test indx == 0
                 end
             end
