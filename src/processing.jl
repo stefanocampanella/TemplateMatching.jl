@@ -29,7 +29,7 @@ function findpeaks(signal::AbstractVector, threshold::Number, distance::Number)
             while height == signal[n_ahead] && n_ahead < stop
                 n_ahead += 1
             end
-            if signal[n_ahead] < height
+            if signal[n_ahead] < height && height > threshold
                 midpoint = div(n + n_ahead, 2)
                 push!(peaks, midpoint)
                 push!(heights, height)
@@ -37,22 +37,12 @@ function findpeaks(signal::AbstractVector, threshold::Number, distance::Number)
         end
     end
 
-    if threshold > 0 || distance > 0
-        tokeep = trues(length(peaks))
-        if threshold > 0
-            tokeep .&= selectbypeaksheight(heights, threshold)
-        end
-        if distance > 0
-            tokeep .&= selectbypeaksdistance(peaks, heights, distance)
-        end
+    if distance > 0
+        tokeep = selectbypeaksdistance(peaks, heights, distance)
         peaks[tokeep], heights[tokeep]
     else
         peaks, heights
     end
-end
-
-function selectbypeaksheight(heights, threshold)
-    heights .> threshold
 end
 
 function selectbypeaksdistance(peaks, heights, distance)
