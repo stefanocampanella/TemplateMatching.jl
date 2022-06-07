@@ -199,10 +199,9 @@ function stack(correlations::AbstractVector{T1}, offsets::AbstractVector{T2}) wh
     elseif length(correlations) != length(offsets)
         throw(DimensionMismatch("Cross-correlations and offsets vectors must have the same length."))
     end
-    stackedcorrelations = OffsetVector.(correlations, -offsets)
-    start = maximum(series -> firstindex(series), stackedcorrelations)
-    stop = minimum(series -> lastindex(series), stackedcorrelations)
-    OffsetVector(mean(series -> view(series, start:stop), stackedcorrelations), start:stop)
+    start = maximum(Base.splat((series, offset) -> firstindex(series) - offset), zip(correlations, offsets))
+    stop = minimum(Base.splat((series, offset) -> lastindex(series) - offset), zip(correlations, offsets))
+    OffsetVector(mean(series -> view(series, start:stop), correlations), start:stop)
 end
 
 """
@@ -219,7 +218,7 @@ function correlatetemplate(data, template, offsets, tolerance, element_type=Floa
     elseif !(length(data) == length(template) == length(offsets))
         throw(DimensionMismatch("Data, template and shifts must have the same length."))
     end
-    correlations = similar(data, Vector{element_type})
+    correlations = similar(data)
     Threads.@threads for n = eachindex(data)
         correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type, usefft=usefft), tolerance)
     end
