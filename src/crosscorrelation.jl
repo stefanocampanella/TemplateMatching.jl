@@ -199,9 +199,8 @@ function stack(correlations::AbstractVector{T1}, offsets::AbstractVector{T2}) wh
     elseif length(correlations) != length(offsets)
         throw(DimensionMismatch("Cross-correlations and offsets vectors must have the same length."))
     end
-    stackedcorrelations = OffsetVector.(correlations, -offsets)
-    start = maximum(series -> firstindex(series), stackedcorrelations)
-    stop = minimum(series -> lastindex(series), stackedcorrelations)
+    start = maximum(firstindex.(correlations) .- offsets)
+    stop = minimum(lastindex.(correlations) .- offsets)
     ranges = [start + offset: stop + offset for offset in offsets]
     OffsetVector(mean(view.(correlations, ranges)), start:stop)
 end
