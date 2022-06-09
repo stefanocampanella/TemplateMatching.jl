@@ -201,7 +201,7 @@ function stack(correlations::AbstractVector{T1}, offsets::AbstractVector{T2}) wh
     end
     start = maximum(firstindex.(correlations) .- offsets)
     stop = minimum(lastindex.(correlations) .- offsets)
-    ranges = [start + offset: stop + offset for offset in offsets]
+    ranges = [start + offset:stop + offset for offset in offsets]
     OffsetVector(mean(view.(correlations, ranges)), start:stop)
 end
 

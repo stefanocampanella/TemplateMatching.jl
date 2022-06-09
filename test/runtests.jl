@@ -75,7 +75,7 @@ end
                 if usefft && CUDA.functional()
                     data_d = CuArray.(data)
                     template_d = CuArray.(template)
-                    cc, indx = findmax(correlatetemplate(data_d, template_d, shifts, 0, type))
+                    cc, indx = findmax(convert(OffsetVector{type, Vector{type}}, correlatetemplate(data_d, template_d, shifts, 0, type)))
                     @test isapprox(1.0, cc, atol=1e-5)
                     @test indx == 0
                 end
