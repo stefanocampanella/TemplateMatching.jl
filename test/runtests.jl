@@ -46,12 +46,19 @@ end
     end
 
     @testset "Max filter" begin
-        @test maxfilter([], 0) == []
-        @test maxfilter([], 1) == []
-        @test maxfilter([], 2) == []
-        @test maxfilter([1, 2, 3], 0) == [1, 2, 3]
-        @test maxfilter([1, 2, 3], 1) == [2, 3, 3]
-        @test maxfilter([1, 2, 3], 2) == [3, 3, 3]
+        cases = [([], 0, []),
+                 ([], 1, []),
+                 ([1, 2, 3], 0, [1, 2, 3]),
+                 ([1, 2, 3], 1, [2, 3, 3]),
+                 ([1, 2, 3], 2, [3, 3, 3])]
+        for (u, l, v) in cases
+            @test maxfilter(u, l) == v
+        end
+        if CUDA.functional()
+            for (u, l, v) in cases
+                @test maxfilter(CuArray(u), l) == CuArray(v)
+            end
+        end
     end
 
     @testset "Stack" begin

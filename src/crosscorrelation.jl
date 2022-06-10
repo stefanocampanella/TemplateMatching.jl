@@ -141,9 +141,17 @@ julia> maxfilter(sin.(0:0.25pi:2pi), 1)
 ```
 """
 function maxfilter(x::AbstractVector, l)
-    y = similar(x)
-    maxfilter!(y, x, l)
-    y
+    if isempty(x)
+        empty(x)
+    elseif l < 1
+        copy(x)
+    else
+        y = similar(x)
+        if length(x) > l
+            maxfilter!(y, x, l)
+        end
+        y
+    end
 end
 
 function maxfilter!(y::AbstractVector, x::AbstractVector, l::Integer)
