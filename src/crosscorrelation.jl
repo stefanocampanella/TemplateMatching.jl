@@ -228,8 +228,20 @@ function correlatetemplate(data, template, offsets, tolerance, element_type=Floa
         throw(DimensionMismatch("Data, template and shifts must have the same length."))
     end
     correlations = similar(data)
-    Threads.@threads for n = eachindex(data)
+    _crosscorrmax!(correlations, data, template, tolerance, element_type, usefft=usefft)
+    stack(correlations, offsets)
+end
+
+function _crosscorrmax!(correlations, data, template, tolerance, element_type=Float64; usefft=true)
+    Threads.@threads for n = eachindex(correlations)
         correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type, usefft=usefft), tolerance)
     end
-    stack(correlations, offsets)
+end
+
+function _crosscorrmax!(correlations, data::Vector{CuVector}, template, tolerance, element_type=Float64; usefft=true)
+    for n = eachindex(correlations)
+        stream() do
+            correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type, usefft=usefft), tolerance)
+        end
+    end
 end
