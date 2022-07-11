@@ -239,8 +239,8 @@ function _crosscorrmax!(correlations, data::AbstractVector{T}, template, toleran
 end
 
 function _crosscorrmax!(correlations, data::AbstractVector{T}, template, tolerance, element_type=Float64; usefft=true) where T <: CuVector
-    for n = eachindex(correlations)
-        stream() do
+    @sync for n = eachindex(correlations)
+        @async begin 
             correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type, usefft=usefft), tolerance)
         end
     end
