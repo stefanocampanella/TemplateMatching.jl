@@ -232,13 +232,13 @@ function correlatetemplate(data, template, offsets, tolerance, element_type=Floa
     stack(correlations, offsets)
 end
 
-function _crosscorrmax!(correlations, data, template, tolerance, element_type=Float64; usefft=true)
+function _crosscorrmax!(correlations, data::AbstractVector{T}, template, tolerance, element_type=Float64; usefft=true) where T <: Vector
     Threads.@threads for n = eachindex(correlations)
         correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type, usefft=usefft), tolerance)
     end
 end
 
-function _crosscorrmax!(correlations, data::Vector{CuVector}, template, tolerance, element_type=Float64; usefft=true)
+function _crosscorrmax!(correlations, data::AbstractVector{T}, template, tolerance, element_type=Float64; usefft=true) where T <: CuVector
     for n = eachindex(correlations)
         stream() do
             correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type, usefft=usefft), tolerance)
