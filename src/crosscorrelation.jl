@@ -97,20 +97,24 @@ function crosscorrelatefft!(cc::AbstractVector{T}, series, template) where {T <:
                 x[1:M] .= series
                 x[M + 1:L] .= zero(T)
                 x_rfft = rfft(x)
+                nothing
             end
             @async begin
                 y = similar(template, T, L)
                 y[1:N] .= template
                 y[N + 1:L] .= zero(T)
                 y_rfft = rfft(y)
+                nothing
             end
         end
         @sync begin
             @async begin
                 cc_ifft = irfft(x_rfft .* conj.(y_rfft), L)
+                nothing
             end
             @async begin
                 cc_norm_squared = N .* moving_sum(x .* x, N) .- moving_sum(x, N).^2
+                nothing
             end
         end
         mask = cc_norm_squared .<= 0.0
@@ -256,6 +260,7 @@ function _crosscorrmax!(correlations, data::AbstractVector{T}, template, toleran
     @sync for n = eachindex(correlations)
         @async begin 
             correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type, usefft=usefft), tolerance)
+            nothing
         end
     end
 end
