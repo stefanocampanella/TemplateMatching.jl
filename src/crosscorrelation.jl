@@ -117,6 +117,7 @@ function crosscorrelatefft!(cc::AbstractVector{T}, series, template) where {T <:
         cc_norm_squared[mask] .= one(eltype(cc_norm_squared))
         cc_ifft[mask] .= zero(eltype(cc_ifft))
         cc .= view(cc_ifft, axes(cc, 1)) ./ sqrt.(view(cc_norm_squared, axes(cc, 1)))
+        nothing
     end
 end
 
