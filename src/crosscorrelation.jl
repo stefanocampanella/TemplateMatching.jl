@@ -91,39 +91,38 @@ function crosscorrelatefft!(cc::AbstractVector{T}, series, template) where {T <:
         nextfastsize[min_size] = L
     end
 
-    let x, x_rfft, y_rfft, cc_ifft, cc_norm_squared
-        @sync begin
-            @async begin
-                x = similar(series, T, L)
-                x[1:M] .= series
-                x[M + 1:L] .= zero(T)
-                x_rfft = rfft(x)
-                return
-            end
-            @async begin
-                y = similar(template, T, L)
-                y[1:N] .= template
-                y[N + 1:L] .= zero(T)
-                y_rfft = rfft(y)
-                return
-            end
+    local x, x_rfft, y_rfft, cc_ifft, cc_norm_squared
+    @sync begin
+        @async begin
+            x = similar(series, T, L)
+            x[1:M] .= series
+            x[M + 1:L] .= zero(T)
+            x_rfft = rfft(x)
+            return
         end
-        @sync begin
-            @async begin
-                cc_ifft = irfft(x_rfft .* conj.(y_rfft), L)
-                return
-            end
-            @async begin
-                cc_norm_squared = N .* moving_sum(x .* x, N) .- moving_sum(x, N).^2
-                return
-            end
+        @async begin
+            y = similar(template, T, L)
+            y[1:N] .= template
+            y[N + 1:L] .= zero(T)
+            y_rfft = rfft(y)
+            return
         end
-        mask = cc_norm_squared .<= 0.0
-        cc_norm_squared[mask] .= one(eltype(cc_norm_squared))
-        cc_ifft[mask] .= zero(eltype(cc_ifft))
-        cc .= view(cc_ifft, axes(cc, 1)) ./ sqrt.(view(cc_norm_squared, axes(cc, 1)))
-        return
     end
+    @sync begin
+        @async begin
+            cc_ifft = irfft(x_rfft .* conj.(y_rfft), L)
+            return
+        end
+        @async begin
+            cc_norm_squared = N .* moving_sum(x .* x, N) .- moving_sum(x, N).^2
+            return
+        end
+    end
+    mask = cc_norm_squared .<= 0.0
+    cc_norm_squared[mask] .= one(eltype(cc_norm_squared))
+    cc_ifft[mask] .= zero(eltype(cc_ifft))
+    cc .= view(cc_ifft, axes(cc, 1)) ./ sqrt.(view(cc_norm_squared, axes(cc, 1)))
+    return
 end
 
 function moving_sum(data, window)
