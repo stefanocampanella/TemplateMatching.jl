@@ -91,7 +91,7 @@ function crosscorrelatefft!(cc::AbstractVector{T}, series, template) where {T <:
         nextfastsize[min_size] = L
     end
 
-    local x, x_rfft, y_rfft, cc_ifft, cc_norm_squared
+    local x, x_rfft, y_rfft, cc_ifft, cc_norm, mask
     @sync begin
         @async begin
             x = similar(series, T, L)
@@ -114,14 +114,15 @@ function crosscorrelatefft!(cc::AbstractVector{T}, series, template) where {T <:
             return
         end
         @async begin
-            cc_norm_squared = N .* moving_sum(x .* x, N) .- moving_sum(x, N).^2
+            cc_norm = N .* moving_sum(x .* x, N) .- moving_sum(x, N).^2
+            mask = cc_norm .<= 0.0
+            cc_norm[mask] .= one(eltype(cc_norm))
+            cc_norm .= sqrt.(cc_norm)
             return
         end
     end
-    mask = cc_norm_squared .<= 0.0
-    cc_norm_squared[mask] .= one(eltype(cc_norm_squared))
     cc_ifft[mask] .= zero(eltype(cc_ifft))
-    cc .= view(cc_ifft, axes(cc, 1)) ./ sqrt.(view(cc_norm_squared, axes(cc, 1)))
+    cc .= view(cc_ifft, axes(cc, 1)) ./ view(cc_norm, axes(cc, 1))
     return
 end
 
