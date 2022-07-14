@@ -70,6 +70,7 @@ function crosscorrelatedirect!(cc, series, template)
         @. series_segment = segment_view / segment_std
         @inbounds cc[n] = dot(series_segment, template) / N
     end
+    return
 end
 
 const nextfastsize = Dict{Int, Int}()
@@ -97,31 +98,31 @@ function crosscorrelatefft!(cc::AbstractVector{T}, series, template) where {T <:
                 x[1:M] .= series
                 x[M + 1:L] .= zero(T)
                 x_rfft = rfft(x)
-                nothing
+                return
             end
             @async begin
                 y = similar(template, T, L)
                 y[1:N] .= template
                 y[N + 1:L] .= zero(T)
                 y_rfft = rfft(y)
-                nothing
+                return
             end
         end
         @sync begin
             @async begin
                 cc_ifft = irfft(x_rfft .* conj.(y_rfft), L)
-                nothing
+                return
             end
             @async begin
                 cc_norm_squared = N .* moving_sum(x .* x, N) .- moving_sum(x, N).^2
-                nothing
+                return
             end
         end
         mask = cc_norm_squared .<= 0.0
         cc_norm_squared[mask] .= one(eltype(cc_norm_squared))
         cc_ifft[mask] .= zero(eltype(cc_ifft))
         cc .= view(cc_ifft, axes(cc, 1)) ./ sqrt.(view(cc_norm_squared, axes(cc, 1)))
-        nothing
+        return
     end
 end
 
@@ -178,6 +179,7 @@ function maxfilter!(y::AbstractVector, x::AbstractVector, l::Integer)
         upper = min(n + l, lastindex(x))
         @inbounds y[n] = maximum(view(x, lower:upper))
     end
+    return
 end
 
 function maxfilter!(y::CuVector, x::CuVector, l::Integer)
@@ -186,6 +188,7 @@ function maxfilter!(y::CuVector, x::CuVector, l::Integer)
     threads = min(length(y), config.threads)
     blocks = cld(length(y), threads)
     kernel(y, x, l; threads, blocks)
+    return
 end
 
 function maxfilter_gpukernel!(y, x, l)
@@ -254,13 +257,15 @@ function _crosscorrmax!(correlations, data::AbstractVector{T}, template, toleran
     Threads.@threads for n = eachindex(correlations)
         correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type, usefft=usefft), tolerance)
     end
+    return
 end
 
 function _crosscorrmax!(correlations, data::AbstractVector{T}, template, tolerance, element_type=Float64; usefft=true) where T <: CuVector
     @sync for n = eachindex(correlations)
         @async begin 
             correlations[n] = maxfilter(crosscorrelate(data[n], template[n], element_type, usefft=usefft), tolerance)
-            nothing
+            return
         end
     end
+    return
 end
