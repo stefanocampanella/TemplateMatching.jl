@@ -81,7 +81,7 @@ julia> let v = sin.(range(0, pi, 256)), x = [zeros(128); v; zeros(128)], y = Tem
 """
 function estimatetoa(trace, waveform, center, tol)
     a, b = max(firstindex(trace), center - tol), min(lastindex(trace), center + tol + length(waveform) - 1)
-    cc = OffsetVector(crosscorrelate(view(trace, a:b), waveform), center - tol - 1)
+    cc = OffsetVector(crosscorrelate(view(trace, a:b), waveform, usefft=false), center - tol - 1)
     cc_max, n_max = findmax_window(cc, center, tol)
     if firstindex(cc) < n_max < lastindex(cc) && cc_max < 1.0 && cc_max ≉ 1.0
         y1, y2, y3 = cc[n_max - 1:n_max + 1]
@@ -91,13 +91,3 @@ function estimatetoa(trace, waveform, center, tol)
         Float64(n_max), cc_max
     end
 end
-
-function line_element(xt, v)
-    x = view(xt, 1:3)
-    t = xt[4]
-    dot(x, x) - v^2 * t^2
-end
-
-residue_rms(xt, sensors_readings_itr, v) = sqrt(mean(ys -> line_element(ys - xt, v)^2, sensors_readings_itr))
-
-locate(sensors_readings_itr, v, guess) = optimize(xt -> residue_rms(xt, sensors_readings_itr, v), guess)

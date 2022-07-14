@@ -3,8 +3,11 @@ using Test
 using StatsBase
 using LinearAlgebra
 using OffsetArrays
+using CUDA
 
-
+if CUDA.functional()
+    @info "Running GPU tests" CUDA.version()
+end
 
 @testset verbose = true "TemplateMatching.jl" begin
     @testset "Cross-correlate" begin
@@ -12,31 +15,50 @@ using OffsetArrays
         @test_throws ArgumentError crosscorrelate(Int[], [1, 2, 3])
         @test_throws DimensionMismatch crosscorrelate([1, 2], [1, 2, 3])
         @test length(crosscorrelate([1, 2, 3], [1, 2])) == 2
-        for direct in (true, false), type = (Float32, Float64)
+        for usefft in (true, false), type = (Float32, Float64)
             let 
                 x = @. 1e3 * ($rand(type, 100) - 0.5)
                 y = @view x[45:55]
                 y_mean, y_std = mean_and_std(y, corrected=false)
                 z = @. (y - y_mean) / y_std
-                @test all(crosscorrelate(x, z, type, normalize_template=false, direct=direct) .≈ crosscorrelate(x, y, type, direct=direct) )
+                @test all(crosscorrelate(x, z, type, normalize_template=false, usefft=usefft) .≈ crosscorrelate(x, y, type, usefft=usefft))
+                if usefft && CUDA.functional()
+                    x_d = CuArray(x)
+                    z_d = CuArray(z)
+                    @test all(crosscorrelate(x_d, z_d, type, normalize_template=false) .≈ crosscorrelate(x_d, z_d, type))
+                end
             end
             let 
                 x = @. 1e3 * ($rand(type, 100) - 0.5)
                 y = @view x[45:55]
-                cc, indx = findmax(crosscorrelate(x, y, type, direct=direct))
+                cc, indx = findmax(crosscorrelate(x, y, type, usefft=usefft))
                 @test cc ≈ 1.0 
                 @test indx == 45
+                if usefft && CUDA.functional()
+                    x_d = CuArray(x)
+                    y_d = CuArray(y)
+                    cc, indx = findmax(crosscorrelate(x_d, y_d, type))
+                    @test cc ≈ 1.0 
+                    @test indx == 45
+                end
             end
         end
     end
 
     @testset "Max filter" begin
-        @test maxfilter([], 0) == []
-        @test maxfilter([], 1) == []
-        @test maxfilter([], 2) == []
-        @test maxfilter([1, 2, 3], 0) == [1, 2, 3]
-        @test maxfilter([1, 2, 3], 1) == [2, 3, 3]
-        @test maxfilter([1, 2, 3], 2) == [3, 3, 3]
+        cases = [(Int[], 0, Int[]),
+                 (Int[], 1, Int[]),
+                 ([1, 2, 3], 0, [1, 2, 3]),
+                 ([1, 2, 3], 1, [2, 3, 3]),
+                 ([1, 2, 3], 2, [3, 3, 3])]
+        for (u, l, v) in cases
+            @test maxfilter(u, l) == v
+        end
+        if CUDA.functional()
+            for (u, l, v) in cases
+                @test maxfilter(CuArray(u), l) == CuArray(v)
+            end
+        end
     end
 
     @testset "Stack" begin
@@ -49,14 +71,21 @@ using OffsetArrays
     @testset "Correlate template" begin
         @test_throws ArgumentError correlatetemplate(Vector{Float64}[], Vector{Float64}[], Int[], 0)
         @test_throws DimensionMismatch correlatetemplate([[1, 2, 3], [4, 5, 6], [7, 8, 9]], [[1, 2, 3], [4, 5, 6]], [1, 2], 0)
-        for direct in (true, false), type = (Float32, Float64)
+        for usefft in (true, false), type = (Float32, Float64)
             let 
                 data = [rand(100) for _ = 1:10]
                 template = [view(data[n], 45 + n:55 + n) for n = eachindex(data)]
                 shifts = [45 + n for n = eachindex(data)]
-                cc, indx = findmax(correlatetemplate(data, template, shifts, 0, type, direct=direct))
-                @test cc ≈ 1.0 
+                cc, indx = findmax(correlatetemplate(data, template, shifts, 0, type, usefft=usefft))
+                @test isapprox(1.0, cc, atol=1e-5)
                 @test indx == 0
+                if usefft && CUDA.functional()
+                    data_d = CuArray.(data)
+                    template_d = CuArray.(template)
+                    cc, indx = findmax(convert(OffsetVector{type, Vector{type}}, correlatetemplate(data_d, template_d, shifts, 0, type)))
+                    @test isapprox(1.0, cc, atol=1e-5)
+                    @test indx == 0
+                end
             end
         end
     end
