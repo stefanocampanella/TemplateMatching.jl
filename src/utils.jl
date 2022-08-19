@@ -177,7 +177,7 @@ from the median of `xs` of the corresponding elements (of `xs`) is at least
 # Examples
 ```jldoctest
 julia> TemplateMatching.mad_test([1, 2, 3, 100], 3)
-4-element Weights{Int64, Bool, BitVector}:
+4-element StatsBase.Weights{Int64, Bool, BitVector}:
  1
  1
  1
