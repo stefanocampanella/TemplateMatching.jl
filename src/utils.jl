@@ -168,7 +168,7 @@ end
 
 
 """
-    mad_test(xs, [r=3])
+    mad_test(xs, r)
 
 Return a vector of booleans whose elements are `true` if the absolute deviation 
 from the median of `xs` of the corresponding elements (of `xs`) is at least 
@@ -176,12 +176,12 @@ from the median of `xs` of the corresponding elements (of `xs`) is at least
 
 # Examples
 ```jldoctest
-julia> TemplateMatching.mad_test([1, 2, 3, 100])
-4-element BitVector:
- 0
- 0
- 0
+julia> TemplateMatching.mad_test([1, 2, 3, 100], 3)
+4-element Weights{Int64, Bool, BitVector}:
  1
+ 1
+ 1
+ 0
 ```
 """
 function mad_test(xs::AbstractVector{<:Number}, r::Number)
@@ -189,7 +189,7 @@ function mad_test(xs::AbstractVector{<:Number}, r::Number)
         weights(BitVector())
     else
         deviations = abs.(xs .- median(xs))
-        weights(deviations .> r * median(deviations))
+        weights(deviations .<= r * median(deviations))
     end
 end
 
