@@ -9,10 +9,9 @@ using OffsetArrays
 using Interpolations
 
 export crosscorrelate, maxfilter, stack, correlatetemplate, findpeaks, 
-       magnitude, findmax_window, subsampleshift, estimatetoa
+       relative_magnitude, findmax_window, subsampleshift, estimatetoa
 
 include("crosscorrelation.jl")
-include("processing.jl")
 include("utils.jl")
 
 end

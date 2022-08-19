@@ -117,21 +117,17 @@ end
         end
     end
 
-    @testset "Magnitude" begin
-        @test isnan(magnitude(Vector{Float64}[], Vector{Float64}[], Int[]))
-        @test isnan(magnitude([rand(100) for _ = 1:10], [fill(0.0, 10) for _ = 1:10], [45 for _ = 1:10]))
-        @test isnan(magnitude([fill(0.0, 100) for _ = 1:10], [rand(10) for _ = 1:10], [45 for _ = 1:10]))
-        let num_series = 3
-            data = [rand(100) for _ = 1:num_series]
-            indices = [rand(1:90) for _ = eachindex(data)]
-            template = [view(data[n], indices[n]:indices[n] + 10) for n = eachindex(data)]
-            @test magnitude(data, template, indices) == 0.0
-        end
-        let num_series = 10_000, n1 = 100, n2 = 20, indx = 40
-            magnitude_test_f(f1, f2) = magnitude([f1(n1) for _ = 1:num_series], [f2(n2) for _ = 1:num_series], [indx for _ = 1:num_series])
-            @test magnitude_test_f(n -> fill(5.0, n), n -> fill(0.5, n)) == 1.0
-            @test isapprox(magnitude_test_f(rand, rand), 0.0, atol=1e-2)
-            @test isapprox(magnitude_test_f(n -> 10 * rand(n), rand), 1.0, atol=1e-2)
+    @testset "Relative magnitude" begin
+        @test_throws ArgumentError relative_magnitude(Float64[], Float64[])
+        @test_throws ArgumentError relative_magnitude([1, 2, 3], [1, 2])
+        let num_trials = 1000, num_samples = 100, const_trace = fill(0.5, num_samples)
+            @test isnan(relative_magnitude(ones(num_samples), zeros(num_samples)))
+            @test isnan(relative_magnitude(zeros(num_samples), ones(num_samples)))
+            @test relative_magnitude(const_trace, const_trace) == 0.0
+
+            magnitude_test_func(factor) = mean(relative_magnitude(factor * rand(num_samples), rand(num_samples)) for _ = 1:num_trials)
+            @test isapprox(magnitude_test_func(1.0), 0.0, atol=1e-2)
+            @test isapprox(magnitude_test_func(10.0), 1.0, atol=1e-2)
         end
     end
 
