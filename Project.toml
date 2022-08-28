@@ -1,7 +1,7 @@
 name = "TemplateMatching"
 uuid = "8a5bafa5-7804-46e7-8ed3-a510d2efa4f5"
 authors = ["Stefano Campanella <15182642+stefanocampanella@users.noreply.github.com> and contributors"]
-version = "0.2.3"
+version = "0.3"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
